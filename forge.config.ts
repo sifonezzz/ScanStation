@@ -36,6 +36,38 @@ const config: ForgeConfig = {
               js: './src/preload.ts',
             },
           },
+          {
+            html: './src/edit-project.html',
+            js: './src/edit-project-renderer.ts',
+            name: 'edit_project_window',
+            preload: {
+              js: './src/preload.ts',
+            },
+          },
+          {
+            html: './src/edit-project.html',
+            js: './src/edit-project-renderer.ts',
+            name: 'edit_project_window',
+            preload: {
+              js: './src/preload.ts',
+            },
+          },
+          {
+            html: './src/chapter-screen.html',
+            js: './src/chapter-screen-renderer.ts',
+            name: 'chapter_screen_window',
+            preload: {
+              js: './src/preload.ts',
+            },
+          },
+          {
+            html: './src/create-chapter.html',
+            js: './src/create-chapter-renderer.ts',
+            name: 'create_chapter_window',
+            preload: {
+              js: './src/preload.ts',
+            },
+          },
         ],
       },
     }),

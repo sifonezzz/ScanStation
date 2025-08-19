@@ -46,13 +46,15 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // *** THIS IS THE FIX FOR THE PREVIEW ***
   window.api.onCoverImageSelected((path) => {
     coverImagePath = path;
-    // Format the path for CSS and set it as the background image
-    const imageUrl = `file://${path.replace(/\\/g, '/')}`;
+    
+    // **DEFINITIVE FIX**: A dummy hostname ('local') is added to create a valid URL structure.
+    const formattedPath = path.replace(/\\/g, '/');
+    const imageUrl = `scanstation-asset://local/${formattedPath}`;
+
     imageSelect.style.backgroundImage = `url('${imageUrl}')`;
-    imageSelect.textContent = ''; // Clear the "Click to select" text
+    imageSelect.textContent = '';
     validateForm();
   });
 });

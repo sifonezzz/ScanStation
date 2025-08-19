@@ -23,16 +23,29 @@
       margin: 0;
       font-size: 20px;
     }
-    #create-project-btn {
+    .header-buttons {
+      display: flex;
+      gap: 10px;
+    }
+    .header-buttons button {
       padding: 8px 16px;
       font-size: 14px;
-      background-color: #7289da;
-      color: white;
       border: none;
       border-radius: 4px;
       cursor: pointer;
       outline: none;
       font-weight: bold;
+    }
+    #edit-btn {
+      background-color: #4a4d52;
+      color: white;
+    }
+    #edit-btn:hover {
+      background-color: #5a5d62;
+    }
+    #create-project-btn {
+      background-color: #7289da;
+      color: white;
     }
     #create-project-btn:hover {
       background-color: #677bc4;
@@ -58,24 +71,66 @@
     .project-card:hover {
       transform: scale(1.05);
     }
+    /* CORRECTED STYLE: This creates the solid bar at the bottom */
     .project-title {
       position: absolute;
       bottom: 0;
       left: 0;
       right: 0;
-      padding: 12px;
-      background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+      padding: 16px 12px;
+      background: rgba(0, 0, 0, 0.7);
       color: white;
       font-weight: bold;
       text-align: center;
       font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      height: 50px;
+    }
+    /* Styles for the new buttons that appear in edit mode */
+    .project-card-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: none; /* Hidden by default */
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      border-radius: 12px;
+    }
+    .project-action-btn {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      font-weight: bold;
+      color: white;
+      font-size: 14px;
+    }
+    .delete-btn {
+      background-color: #f04747; /* Red */
+    }
+    .edit-project-btn {
+      background-color: #43b581; /* Green */
+    }
+    /* When the grid is in edit mode, show the overlay on the cards */
+    .edit-mode .project-card-overlay {
+      display: flex;
     }
   </style>
 </head>
 <body>
   <div class="header">
     <h1>Your Projects</h1>
-    <button id="create-project-btn">+ New Project</button>
+    <div class="header-buttons">
+      <button id="edit-btn">Edit</button>
+      <button id="create-project-btn">+ New Project</button>
+    </div>
   </div>
   <div id="project-grid"></div>
 </body>
