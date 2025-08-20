@@ -9,7 +9,7 @@
       margin: 0;
       background-color: #23272a;
       color: #ffffff;
-      overflow-x: hidden; /* Prevent horizontal scrollbar */
+      overflow-x: hidden;
     }
     .header {
       display: flex;
@@ -19,14 +19,8 @@
       background-color: #2c2f33;
       border-bottom: 1px solid #4a4d52;
     }
-    .header h1 {
-      margin: 0;
-      font-size: 20px;
-    }
-    .header-buttons {
-      display: flex;
-      gap: 10px;
-    }
+    .header h1 { margin: 0; font-size: 20px; }
+    .header-buttons { display: flex; gap: 10px; }
     .header-buttons button {
       padding: 8px 16px;
       font-size: 14px;
@@ -36,20 +30,30 @@
       outline: none;
       font-weight: bold;
     }
-    #edit-btn {
-      background-color: #4a4d52;
-      color: white;
+    #edit-btn, #set-token-btn { background-color: #4a4d52; color: white; }
+    #edit-btn:hover { background-color: #5a5d62; }
+    #add-repo-btn, #create-project-btn { background-color: #7289da; color: white; }
+    #add-repo-btn:hover, #create-project-btn:hover { background-color: #677bc4; }
+    .header-left { display: flex; align-items: center; gap: 15px; }
+    #repo-dropdown { 
+        padding: 8px; font-size: 14px; border-radius: 4px; 
+        background-color: #23272a; color: white; border: 1px solid #4a4d52;
     }
-    #edit-btn:hover {
-      background-color: #5a5d62;
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.6); display: none;
+        align-items: center; justify-content: center; z-index: 1000;
     }
-    #create-project-btn {
-      background-color: #7289da;
-      color: white;
+    .modal-content {
+        background: #2c2f33; padding: 25px; border-radius: 8px;
+        width: 90%; max-width: 500px; text-align: center;
     }
-    #create-project-btn:hover {
-      background-color: #677bc4;
-    }
+    .modal-content p { color: #99aab5; line-height: 1.5; }
+    .modal-content input { width: 100%; padding: 10px; margin: 15px 0; box-sizing: border-box; }
+    .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+    #modal-cancel-btn, #token-cancel-btn { background-color: #4a4d52; color: white; }
+    #modal-pull-btn, #token-save-btn { background-color: #43b581; color: white; }
+
     #project-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -58,80 +62,81 @@
     }
     .project-card {
       position: relative;
-      aspect-ratio: 512 / 728; /* Maintain cover aspect ratio */
+      aspect-ratio: 512 / 728;
       background-color: #2c2f33;
-      border-radius: 12px; /* Rounded corners */
+      border-radius: 12px;
       background-size: cover;
       background-position: center;
       cursor: pointer;
-      overflow: hidden; /* Keep title inside rounded corners */
+      overflow: hidden;
       transition: transform 0.2s ease-in-out;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
-    .project-card:hover {
-      transform: scale(1.05);
-    }
-    /* CORRECTED STYLE: This creates the solid bar at the bottom */
+    .project-card:hover { transform: scale(1.05); }
     .project-title {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      padding: 16px 12px;
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      font-weight: bold;
-      text-align: center;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-sizing: border-box;
-      height: 50px;
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 16px 12px; background: rgba(0, 0, 0, 0.7);
+      color: white; font-weight: bold; text-align: center;
+      font-size: 14px; display: flex; align-items: center;
+      justify-content: center; box-sizing: border-box; height: 50px;
     }
-    /* Styles for the new buttons that appear in edit mode */
     .project-card-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
       background-color: rgba(0, 0, 0, 0.5);
-      display: none; /* Hidden by default */
-      align-items: center;
-      justify-content: center;
-      gap: 15px;
-      border-radius: 12px;
+      display: none; align-items: center;
+      justify-content: center; gap: 15px; border-radius: 12px;
     }
     .project-action-btn {
-      padding: 10px 15px;
-      border: none;
-      border-radius: 50px;
-      cursor: pointer;
-      font-weight: bold;
-      color: white;
-      font-size: 14px;
+      padding: 10px 15px; border: none; border-radius: 50px;
+      cursor: pointer; font-weight: bold; color: white; font-size: 14px;
     }
-    .delete-btn {
-      background-color: #f04747; /* Red */
-    }
-    .edit-project-btn {
-      background-color: #43b581; /* Green */
-    }
-    /* When the grid is in edit mode, show the overlay on the cards */
-    .edit-mode .project-card-overlay {
-      display: flex;
-    }
+    .delete-btn { background-color: #f04747; }
+    .edit-project-btn { background-color: #43b581; }
+    .edit-mode .project-card-overlay { display: flex; }
+
+    #push-repo-btn { background-color: #43b581; color: white; }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>Your Projects</h1>
+    <div class="header-left">
+      <h1>Your Projects</h1>
+      <select id="repo-dropdown"></select>
+    </div>
     <div class="header-buttons">
+      <button id="set-token-btn">Set Token</button>
       <button id="edit-btn">Edit</button>
+      <button id="add-repo-btn">+ Add Repository</button>
+      <button id="push-repo-btn">Push Repository</button>
       <button id="create-project-btn">+ New Project</button>
     </div>
   </div>
   <div id="project-grid"></div>
+
+  <div id="add-repo-modal" class="modal-overlay">
+    <div class="modal-content">
+        <p>This function requires a created repository before working. After that, place the link in the text box below.
+            <br><br>
+            Please note that the owner of the repository has to give you permission to modify its files for the app to work correctly. Check the Scanstation repository for more information on this app's usage.
+        </p>
+        <input type="text" id="repo-url-input" placeholder="https://github.com/user/repo.git">
+        <div class="modal-buttons">
+            <button id="modal-cancel-btn">Cancel</button>
+            <button id="modal-pull-btn">Pull Files</button>
+        </div>
+    </div>
+  </div>
+
+  <div id="set-token-modal" class="modal-overlay">
+    <div class="modal-content">
+        <p>Please enter your GitHub Personal Access Token (PAT). This is stored locally and used for all Git operations on private repositories.</p>
+        <input type="password" id="token-input" placeholder="ghp_...">
+        <div class="modal-buttons">
+            <button id="token-cancel-btn">Cancel</button>
+            <button id="token-save-btn">Save Token</button>
+        </div>
+    </div>
+  </div>
+
 </body>
 </html>

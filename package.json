@@ -42,6 +42,7 @@
     "typescript": "~4.5.4"
   },
   "dependencies": {
+    "babel-runtime": "^6.26.0",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^10.1.0",
     "sharp": "^0.34.3",
