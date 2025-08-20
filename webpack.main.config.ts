@@ -1,7 +1,6 @@
-import type { Configuration } from 'webpack';
-import { rules } from './webpack.rules';
+const rules = require('./webpack.rules.ts');
 
-export const mainConfig: Configuration = {
+const mainConfig = {
   /**
    * This is the main entry point for your application, it's the first file
    * that runs in the main process.
@@ -11,7 +10,6 @@ export const mainConfig: Configuration = {
   module: {
     rules,
   },
-  // This is the crucial part to fix the "Cannot find module" error at runtime.
   externals: {
     'simple-git': 'commonjs simple-git',
     'fs-extra': 'commonjs fs-extra',
@@ -20,3 +18,5 @@ export const mainConfig: Configuration = {
     extensions: ['.js', '.ts', '.jsx', '.tsx', '.css', '.json'],
   },
 };
+
+module.exports = mainConfig;

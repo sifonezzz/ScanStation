@@ -5,20 +5,15 @@ import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import { WebpackPlugin } from '@electron-forge/plugin-webpack';
 
-import { mainConfig } from './webpack.main.config';
-import { rendererConfig } from './webpack.renderer.config';
-
 const config: ForgeConfig = {
   packagerConfig: {},
   rebuildConfig: {},
   makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
   plugins: [
     new WebpackPlugin({
-      mainConfig,
+      mainConfig: './webpack.main.config.ts',
       renderer: {
-        config: rendererConfig,
-        // This is the crucial change. We are now telling the build tool
-        // about both of our HTML/TS entry points.
+        config: './webpack.renderer.config.ts',
         entryPoints: [
           {
             html: './src/index.html',
@@ -32,14 +27,6 @@ const config: ForgeConfig = {
             html: './src/create-project.html',
             js: './src/create-project-renderer.ts',
             name: 'create_project_window',
-            preload: {
-              js: './src/preload.ts',
-            },
-          },
-          {
-            html: './src/edit-project.html',
-            js: './src/edit-project-renderer.ts',
-            name: 'edit_project_window',
             preload: {
               js: './src/preload.ts',
             },

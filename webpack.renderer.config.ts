@@ -1,13 +1,12 @@
-import type { Configuration } from 'webpack';
-import { rules } from './webpack.rules';
-import { plugins } from './webpack.plugins';
+const rules = require('./webpack.rules.ts');
+const plugins = require('./webpack.plugins.ts');
 
 rules.push({
   test: /\.css$/,
   use: [{ loader: 'style-loader' }, { loader: 'css-loader' }],
 });
 
-export const rendererConfig: Configuration = {
+const rendererConfig = {
   module: {
     rules,
   },
@@ -16,3 +15,5 @@ export const rendererConfig: Configuration = {
     extensions: ['.js', '.ts', '.jsx', '.tsx', '.css'],
   },
 };
+
+module.exports = rendererConfig;

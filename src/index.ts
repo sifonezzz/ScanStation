@@ -26,24 +26,38 @@ let createChapterWindow: BrowserWindow | null = null;
 // Store the last known window bounds to maintain size/position during navigation
 let lastWindowBounds: Electron.Rectangle = { width: 800, height: 600, x: undefined, y: undefined };
 
-async function loadProjects(mainWindow: BrowserWindow) {
-  const storagePath = getStoragePath();
+async function loadProjects(mainWindow: BrowserWindow, repositoryName: string) {
+  if (!mainWindow || mainWindow.isDestroyed() || !repositoryName) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('projects-loaded', []);
+    }
+    return;
+  }
+  
+  const repoPath = path.join(getStoragePath(), repositoryName);
+
   try {
-    await fs.ensureDir(storagePath);
-    const projectFolders = await fs.readdir(storagePath, { withFileTypes: true });
+    await fs.ensureDir(repoPath);
+    const projectFolders = await fs.readdir(repoPath, { withFileTypes: true });
     const projects = [];
     for (const folder of projectFolders) {
       if (folder.isDirectory()) {
-        const coverPath = path.join(storagePath, folder.name, 'cover.jpg');
+        const coverPath = path.join(repoPath, folder.name, 'cover.jpg');
         if (await fs.pathExists(coverPath)) {
           projects.push({ name: folder.name, coverPath });
         }
       }
     }
-    mainWindow.webContents.send('projects-loaded', projects);
+    // Add a final check before sending the results
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('projects-loaded', projects);
+    }
   } catch (error) {
     console.error('Could not read projects directory:', error);
-    mainWindow.webContents.send('projects-loaded', []);
+    // Add a final check here as well, in case the error happens
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('projects-loaded', []);
+    }
   }
 }
 
