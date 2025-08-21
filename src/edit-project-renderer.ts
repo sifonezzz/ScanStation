@@ -1,65 +1,66 @@
 declare global {
   interface Window {
     api: {
-      // API for receiving the initial project data from the main process
-      onProjectDataForEdit: (callback: (data: { name: string; coverPath: string }) => void) => void;
-      // Re-using the same image selection logic as the create window
-      selectCoverImage: () => void;
-      onCoverImageSelected: (callback: (path: string) => void) => void;
-      // API for submitting the final changes
-      submitProjectUpdate: (data: { originalName: string; newName: string; newCoverPath: string | null }) => void;
-      // API to close the window
-      cancelProjectUpdate: () => void;
+      onProjectDataForCreateChapter: (callback: (data: { repoName: string, projectName: string }) => void) => void;
+      submitChapterCreation: (data: {
+        repoName: string;
+        projectName: string;
+        chapterNumber: string;
+        chapterName: string;
+        includeFinal: boolean;
+      }) => Promise<{ success: boolean }>;
+      cancelChapterCreation: () => void;
     };
   }
 }
 
-let newCoverPath: string | null = null;
+let currentRepoName: string | null = null;
+let currentProjectName: string | null = null;
 
 window.addEventListener('DOMContentLoaded', () => {
-  const nameInput = document.getElementById('project-name') as HTMLInputElement;
-  const originalNameInput = document.getElementById('original-project-name') as HTMLInputElement;
-  const imageSelect = document.getElementById('cover-image-select');
-  const cancelBtn = document.getElementById('cancel-btn');
-  const saveBtn = document.getElementById('save-btn');
+    const numberInput = document.getElementById('chapter-number') as HTMLInputElement;
+    const nameInput = document.getElementById('chapter-name') as HTMLInputElement;
+    const finalFolderCheckbox = document.getElementById('include-final-folder') as HTMLInputElement;
+    const cancelBtn = document.getElementById('cancel-btn');
+    const createBtn = document.getElementById('create-btn');
 
-  // 1. Listen for the initial project data from the main process and populate the form
-  window.api.onProjectDataForEdit((data) => {
-    nameInput.value = data.name;
-    originalNameInput.value = data.name; // Store the original name
+    // 1. Receive both repoName and projectName from the main process
+    window.api.onProjectDataForCreateChapter((data) => {
+        currentRepoName = data.repoName;
+        currentProjectName = data.projectName;
+    });
 
-    const formattedPath = data.coverPath.replace(/\\/g, '/');
-    const imageUrl = `scanstation-asset://local/${formattedPath}`;
-    imageSelect.style.backgroundImage = `url('${imageUrl}')`;
-    imageSelect.textContent = '';
-  });
+    // 2. Handle button clicks
+    cancelBtn.addEventListener('click', () => {
+        window.api.cancelChapterCreation();
+    });
 
-  // 2. Handle new cover image selection
-  imageSelect.addEventListener('click', () => {
-    window.api.selectCoverImage();
-  });
+    createBtn.addEventListener('click', async () => {
+        const chapterNumber = numberInput.value;
+        const chapterName = nameInput.value.trim();
+        const includeFinal = finalFolderCheckbox.checked;
 
-  window.api.onCoverImageSelected((path) => {
-    newCoverPath = path; // Store the path of the *new* image
-    const formattedPath = path.replace(/\\/g, '/');
-    const imageUrl = `scanstation-asset://local/${formattedPath}`;
-    imageSelect.style.backgroundImage = `url('${imageUrl}')`;
-  });
+        if (!currentRepoName || !currentProjectName) {
+            alert('Error: No project context found.');
+            return;
+        }
+        if (!chapterNumber || !chapterName) {
+            alert('Chapter number and name are required.');
+            return;
+        }
 
-  // 3. Handle cancel and save actions
-  cancelBtn.addEventListener('click', () => {
-    window.api.cancelProjectUpdate();
-  });
-
-  saveBtn.addEventListener('click', () => {
-    const originalName = originalNameInput.value;
-    const newName = nameInput.value.trim();
-    if (newName) {
-      window.api.submitProjectUpdate({ originalName, newName, newCoverPath });
-    } else {
-      alert('Project name cannot be empty.');
-    }
-  });
+        const result = await window.api.submitChapterCreation({
+            repoName: currentRepoName, // Include repoName in the submission
+            projectName: currentProjectName,
+            chapterNumber,
+            chapterName,
+            includeFinal
+        });
+        // The main process will close the window on success
+        if (!result.success) {
+            // Error was already shown by the main process
+        }
+    });
 });
 
 export {};

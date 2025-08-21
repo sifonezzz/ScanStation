@@ -1,6 +1,7 @@
 declare global {
   interface Window {
     api: {
+      // Main screen APIs
       createProject: (repoName: string) => void;
       onProjectsLoaded: (callback: (projects: Project[]) => void) => void;
       openProject: (repoName: string, projectName: string) => void;
@@ -10,11 +11,24 @@ declare global {
       getRepositories: () => Promise<{ repositories: string[], selected: string | null }>;
       setSelectedRepository: (repoName: string) => void;
       addRepository: (repoUrl: string) => Promise<{ success: boolean, repoName?: string }>;
-      gitSyncRepository: (repoName: string) => Promise<{ success: boolean, message?: string }>;
-      // Updated Token APIs
       getPatStatus: () => Promise<boolean>;
       setPat: (token: string) => Promise<void>;
       removePat: () => Promise<void>;
+
+      // Navigation APIs
+      onShowChapterScreen: (callback: (data: { repoName: string, projectName: string }) => void) => void;
+      onShowProjectScreen: (callback: () => void) => void;
+
+      // Chapter screen APIs
+      getChapters: (repoName: string, projectName: string) => void;
+      onChaptersLoaded: (callback: (chapters: { name: string }[]) => void) => void;
+      openCreateChapterWindow: (repoName: string, projectName: string) => void;
+      goBackToProjects: () => void;
+      gitStatus: (repoName: string) => Promise<any>;
+      gitCommit: (repoName: string, message: string) => Promise<any>;
+      gitPush: (repoName: string) => Promise<any>;
+      gitPull: (repoName: string) => Promise<{ success: boolean, message?: string }>;
+      gitSyncRepository: (repoName: string) => Promise<{ success: boolean, message?: string }>;
     };
   }
   interface Project {
@@ -23,30 +37,145 @@ declare global {
   }
 }
 
+let currentRepoName: string | null = null;
+let currentProjectName: string | null = null;
+// --- State for Project Screen ---
+let isEditMode = false;
+let currentRepositories: string[] = [];
+let selectedRepository: string | null = null;
+let hasPat = false;
+
 window.addEventListener('DOMContentLoaded', () => {
+  // --- Screen Containers ---
+  const projectScreen = document.getElementById('project-screen');
+  const chapterScreen = document.getElementById('chapter-screen');
+
+  // --- Elements for Project Screen ---
   const createProjectBtn = document.getElementById('create-project-btn');
   const editBtn = document.getElementById('edit-btn');
   const projectGrid = document.getElementById('project-grid');
   const repoDropdown = document.getElementById('repo-dropdown') as HTMLSelectElement;
   const addRepoBtn = document.getElementById('add-repo-btn');
   const pushRepoBtn = document.getElementById('push-repo-btn');
+  const pullRepoBtn = document.getElementById('pull-repo-btn');
   const setTokenBtn = document.getElementById('set-token-btn');
-
   const addRepoModal = document.getElementById('add-repo-modal');
   const modalCancelBtn = document.getElementById('modal-cancel-btn');
   const modalPullBtn = document.getElementById('modal-pull-btn');
   const repoUrlInput = document.getElementById('repo-url-input') as HTMLInputElement;
-
   const setTokenModal = document.getElementById('set-token-modal');
   const tokenInput = document.getElementById('token-input') as HTMLInputElement;
   const tokenCancelBtn = document.getElementById('token-cancel-btn');
   const tokenSaveBtn = document.getElementById('token-save-btn');
 
-  let isEditMode = false;
-  let currentRepositories: string[] = [];
-  let selectedRepository: string | null = null;
-  let hasPat = false; // State variable to track if PAT is set
+  // --- Elements for Chapter Screen ---
+  const projectNameHeader = document.getElementById('project-name-header');
+  const chapterGrid = document.getElementById('chapter-grid');
+  const createChapterBtn = document.getElementById('create-chapter-btn');
+  const backBtn = document.getElementById('back-to-projects-btn');
+  const statusBtn = document.getElementById('git-status-btn');
+  const gitPushBtn = document.getElementById('git-push-btn');
+  const changedFilesDiv = document.getElementById('git-changed-files');
+  const commitMessageInput = document.getElementById('git-commit-message') as HTMLInputElement;
+  const commitBtn = document.getElementById('git-commit-btn');
 
+  // --- Screen Navigation Logic ---
+  window.api.onShowChapterScreen((data) => {
+      currentRepoName = data.repoName;
+      currentProjectName = data.projectName;
+      projectNameHeader.textContent = data.projectName;
+      window.api.getChapters(data.repoName, data.projectName);
+
+      projectScreen.style.display = 'none';
+      chapterScreen.style.display = 'block';
+  });
+
+  window.api.onShowProjectScreen(() => {
+      chapterScreen.style.display = 'none';
+      projectScreen.style.display = 'block';
+      if (selectedRepository) {
+          window.api.loadProjects(selectedRepository);
+      }
+  });
+
+  // --- CHAPTER SCREEN LOGIC ---
+  const showGitStatus = (text: string) => {
+    changedFilesDiv.textContent = text;
+  };
+
+  window.api.onChaptersLoaded((chapters) => {
+    chapterGrid.innerHTML = '';
+    if (chapters.length === 0) {
+        chapterGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">No chapters found. Click '+ New Chapter' to get started!</p>`;
+        return;
+    }
+    for (const chapter of chapters) {
+        const card = document.createElement('div');
+        card.className = 'chapter-card';
+        card.textContent = chapter.name.replace(/_/g, ' ');
+        chapterGrid.appendChild(card);
+    }
+  });
+
+  createChapterBtn.addEventListener('click', () => {
+      if (currentRepoName && currentProjectName) {
+          window.api.openCreateChapterWindow(currentRepoName, currentProjectName);
+      }
+  });
+
+  backBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.api.goBackToProjects();
+  });
+
+  statusBtn.addEventListener('click', async () => {
+    if (!currentRepoName) return;
+    showGitStatus('Checking for changes...');
+    try {
+        const status = await window.api.gitStatus(currentRepoName);
+        const changed = status.files.length;
+        if (changed === 0) {
+            showGitStatus('No changes detected.');
+        } else {
+            const fileList = status.files.map((f: { working_dir: string, path: string }) => `${f.working_dir} ${f.path}`).join('\n');
+            showGitStatus(`${changed} file(s) changed:\n${fileList}`);
+        }
+    } catch (error) {
+        showGitStatus(`Error checking status: ${error.message}`);
+    }
+  });
+
+  commitBtn.addEventListener('click', async () => {
+    if (!currentRepoName) return;
+    const message = commitMessageInput.value.trim();
+    if (!message) {
+        alert('Please enter a commit message.');
+        return;
+    }
+    showGitStatus('Committing...');
+    try {
+        await window.api.gitCommit(currentRepoName, message);
+        commitMessageInput.value = '';
+        showGitStatus('Commit successful! Ready to push.');
+        await statusBtn.click(); // Refresh status
+    } catch (error) {
+        showGitStatus(`Error committing: ${error.message}`);
+    }
+  });
+
+  gitPushBtn.addEventListener('click', async () => {
+    if (!currentRepoName) return;
+    showGitStatus('Pushing changes to GitHub...');
+    try {
+        await window.api.gitPush(currentRepoName);
+        showGitStatus('Push successful! Your repository is up to date.');
+    } catch (error) {
+        showGitStatus(`Error pushing: ${error.message}\nMake sure you are a collaborator and have set a valid Personal Access Token.`);
+    }
+  });
+
+
+  // --- PROJECT SCREEN LOGIC ---
   async function initialize() {
     hasPat = await window.api.getPatStatus();
     updateSetTokenButton();
@@ -55,12 +184,11 @@ window.addEventListener('DOMContentLoaded', () => {
     currentRepositories = repositories;
     selectedRepository = selected;
     updateRepoDropdown();
-
     if (selectedRepository) {
       window.api.loadProjects(selectedRepository);
     } else {
 		projectGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">Please add a repository to get started!</p>`;
-	}
+    }
   }
 
   function updateSetTokenButton() {
@@ -100,17 +228,16 @@ window.addEventListener('DOMContentLoaded', () => {
 
   editBtn.addEventListener('click', () => {
     isEditMode = !isEditMode;
+    projectGrid.classList.toggle('edit-mode');
     if (isEditMode) {
       editBtn.textContent = 'Done';
       editBtn.style.backgroundColor = '#7289da';
-      projectGrid.classList.add('edit-mode');
     } else {
       editBtn.textContent = 'Edit';
       editBtn.style.backgroundColor = '';
-      projectGrid.classList.remove('edit-mode');
     }
   });
-  
+
   pushRepoBtn.addEventListener('click', async () => {
     if (!selectedRepository) {
         alert('Please select a repository to sync.');
@@ -129,16 +256,34 @@ window.addEventListener('DOMContentLoaded', () => {
         pushRepoBtn.removeAttribute('disabled');
     }
   });
+  
+  pullRepoBtn.addEventListener('click', async () => {
+    if (!selectedRepository) {
+        alert('Please select a repository to pull from.');
+        return;
+    }
+    const originalText = pullRepoBtn.textContent;
+    pullRepoBtn.textContent = 'Pulling...';
+    pullRepoBtn.setAttribute('disabled', 'true');
+    try {
+        const result = await window.api.gitPull(selectedRepository);
+        alert(result.message);
+        window.api.loadProjects(selectedRepository);
+    } catch (error) {
+        alert(`Failed to pull repository: ${error.message}`);
+    } finally {
+        pullRepoBtn.textContent = originalText;
+        pullRepoBtn.removeAttribute('disabled');
+    }
+  });
 
   setTokenBtn.addEventListener('click', async () => {
     if (hasPat) {
-        // If token exists, remove it
         await window.api.removePat();
         hasPat = false;
         alert('Access token removed successfully.');
         updateSetTokenButton();
     } else {
-        // If no token, open the modal to set one
         tokenInput.value = '';
         setTokenModal.style.display = 'flex';
     }
@@ -206,7 +351,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     
     if (projects.length === 0) {
-      projectGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">No projects found in this repository. Click '+ New Project' to get started!</p>`;
+      projectGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">No projects found. Click '+ New Project' to get started!</p>`;
       return;
     }
 
@@ -215,7 +360,7 @@ window.addEventListener('DOMContentLoaded', () => {
       card.className = 'project-card';
       
       const formattedPath = project.coverPath.replace(/\\/g, '/');
-      const imageUrl = `scanstation-asset://local/${formattedPath}`;
+      const imageUrl = `scanstation-asset:///${formattedPath}`;
       card.style.backgroundImage = `url('${imageUrl}')`;
 
       const title = document.createElement('div');

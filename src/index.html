@@ -19,9 +19,20 @@
       background-color: #2c2f33;
       border-bottom: 1px solid #4a4d52;
     }
-    .header h1 { margin: 0; font-size: 20px; }
-    .header-buttons { display: flex; gap: 10px; }
-    .header-buttons button {
+    .header h1 { 
+      margin: 0; 
+      font-size: 20px; 
+    }
+    .header-left { 
+      display: flex;
+      align-items: center; 
+      gap: 15px; 
+    }
+    .header-buttons { 
+      display: flex;
+      gap: 10px; 
+    }
+    .header button {
       padding: 8px 16px;
       font-size: 14px;
       border: none;
@@ -30,17 +41,30 @@
       outline: none;
       font-weight: bold;
     }
-    #edit-btn, #set-token-btn { background-color: #4a4d52; color: white; }
-    #edit-btn:hover { background-color: #5a5d62; }
-    #add-repo-btn, #create-project-btn { background-color: #7289da; color: white; }
-    #add-repo-btn:hover, #create-project-btn:hover { background-color: #677bc4; }
-    .header-left { display: flex; align-items: center; gap: 15px; }
+    #edit-btn, #set-token-btn { 
+      background-color: #4a4d52;
+      color: white; 
+    }
+    #edit-btn:hover { 
+      background-color: #5a5d62; 
+    }
+    #add-repo-btn, #create-project-btn, #pull-repo-btn, #create-chapter-btn { 
+      background-color: #7289da;
+      color: white; 
+    }
+    #add-repo-btn:hover, #create-project-btn:hover, #pull-repo-btn:hover, #create-chapter-btn:hover { 
+      background-color: #677bc4; 
+    }
     #repo-dropdown { 
-        padding: 8px; font-size: 14px; border-radius: 4px; 
+        padding: 8px;
+        font-size: 14px; border-radius: 4px; 
         background-color: #23272a; color: white; border: 1px solid #4a4d52;
     }
+
+    /* Modal Styles */
     .modal-overlay {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        position: fixed; top: 0; left: 0;
+        width: 100%; height: 100%;
         background: rgba(0, 0, 0, 0.6); display: none;
         align-items: center; justify-content: center; z-index: 1000;
     }
@@ -54,6 +78,7 @@
     #modal-cancel-btn, #token-cancel-btn { background-color: #4a4d52; color: white; }
     #modal-pull-btn, #token-save-btn { background-color: #43b581; color: white; }
 
+    /* Project Screen Styles */
     #project-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -83,42 +108,161 @@
     .project-card-overlay {
       position: absolute; top: 0; left: 0; right: 0; bottom: 0;
       background-color: rgba(0, 0, 0, 0.5);
-      display: none; align-items: center;
-      justify-content: center; gap: 15px; border-radius: 12px;
+      display: none; align-items: center; justify-content: center;
+      gap: 15px; border-radius: 12px;
     }
     .project-action-btn {
-      padding: 10px 15px; border: none; border-radius: 50px;
+      padding: 10px 15px; border: none;
+      border-radius: 50px;
       cursor: pointer; font-weight: bold; color: white; font-size: 14px;
     }
     .delete-btn { background-color: #f04747; }
     .edit-project-btn { background-color: #43b581; }
     .edit-mode .project-card-overlay { display: flex; }
-
     #push-repo-btn { background-color: #43b581; color: white; }
-  </style>
+
+    /* Chapter Screen Styles */
+    .back-btn { 
+        font-size: 24px; 
+        color: white; 
+        text-decoration: none; 
+        font-weight: bold;
+    }
+    #chapter-grid { 
+        display: flex;
+        flex-direction: column; 
+        gap: 12px; 
+        padding: 24px; 
+    }
+    .chapter-card { 
+        background-color: #2c2f33; 
+        border-radius: 8px;
+        padding: 16px 20px; 
+        font-size: 16px; 
+        cursor: pointer; 
+        transition: background-color 0.2s;
+    }
+    .chapter-card:hover { 
+        background-color: #3b3e44; 
+    }
+    .git-container { 
+        padding: 24px;
+        border-bottom: 1px solid #4a4d52;
+    }
+    .git-header { 
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between;
+        margin-bottom: 15px; 
+    }
+    .git-header h2 { 
+        margin: 0; 
+        font-size: 18px;
+    }
+    .git-buttons button { 
+        padding: 8px 16px; 
+        font-size: 14px; 
+        border: none; 
+        border-radius: 4px;
+        cursor: pointer; 
+        font-weight: bold; 
+    }
+    #git-status-btn { 
+        background-color: #4a4d52; 
+        color: white;
+    }
+    #git-push-btn { 
+        background-color: #43b581; 
+        color: white;
+    }
+    #git-changed-files { 
+        background-color: #23272a; 
+        border-radius: 4px; 
+        padding: 10px; 
+        min-height: 50px;
+        font-family: monospace;
+        font-size: 12px; 
+        color: #99aab5; 
+        margin-bottom: 15px; 
+    }
+    .commit-area { 
+        display: flex; 
+        gap: 10px;
+    }
+    #git-commit-message { 
+        flex-grow: 1; 
+        padding: 8px; 
+        border-radius: 4px; 
+        border: 1px solid #4a4d52;
+        background-color: #23272a; 
+        color: white; 
+    }
+    #git-commit-btn { 
+        background-color: #7289da; 
+        color: white;
+    }
+    .git-instructions {
+        font-size: 12px;
+        color: #99aab5;
+        text-align: center;
+        margin: -5px 0 15px 0;
+    }
+</style>
 </head>
 <body>
-  <div class="header">
-    <div class="header-left">
-      <h1>Your Projects</h1>
-      <select id="repo-dropdown"></select>
+  <div id="project-screen">
+    <div class="header">
+      <div class="header-left">
+        <h1>Your Projects</h1>
+        <select id="repo-dropdown"></select>
+        <button id="pull-repo-btn">Pull Repository</button>
+        <button id="push-repo-btn">Push Repository</button>
+      </div>
+      <div class="header-buttons">
+        <button id="set-token-btn">Set Token</button>
+        <button id="edit-btn">Edit</button>
+        <button id="add-repo-btn">+ Add Repository</button>
+        <button id="create-project-btn">+ New Project</button>
+      </div>
     </div>
-    <div class="header-buttons">
-      <button id="set-token-btn">Set Token</button>
-      <button id="edit-btn">Edit</button>
-      <button id="add-repo-btn">+ Add Repository</button>
-      <button id="push-repo-btn">Push Repository</button>
-      <button id="create-project-btn">+ New Project</button>
-    </div>
+    <div id="project-grid"></div>
   </div>
-  <div id="project-grid"></div>
+
+  <div id="chapter-screen" style="display: none;">
+    <div class="header">
+        <div class="header-left">
+            <a href="#" id="back-to-projects-btn" class="back-btn">&larr;</a>
+            <h1 id="project-name-header"></h1>
+        </div>
+        <button id="create-chapter-btn">+ New Chapter</button>
+    </div>
+
+    <div class="git-container">
+        <div class="git-header">
+            <h2>Source Control</h2>
+            <div class="git-buttons">
+                <button id="git-status-btn">Refresh Status</button>
+                <button id="git-push-btn">Push to GitHub</button>
+            </div>
+        </div>
+        <p class="git-instructions">To upload chapters, first commit your changes, then press 'Push to GitHub'.</p>
+        <div id="git-changed-files">Click 'Refresh Status' to see file changes.</div>
+        <div class="commit-area">
+          <input type="text" id="git-commit-message" placeholder="Commit message (e.g., Updated Chapter 5)">
+            <button id="git-commit-btn">Commit Changes</button>
+        </div>
+    </div>
+
+    <div id="chapter-grid"></div>
+  </div>
 
   <div id="add-repo-modal" class="modal-overlay">
     <div class="modal-content">
-        <p>This function requires a created repository before working. After that, place the link in the text box below.
-            <br><br>
-            Please note that the owner of the repository has to give you permission to modify its files for the app to work correctly. Check the Scanstation repository for more information on this app's usage.
-        </p>
+      <p>This function requires a created repository before working. After that, place the link in the text box below.
+      <br><br>
+          Please note that the owner of the repository has to give you permission to modify its files for the app to work correctly.
+      Check the Scanstation repository for more information on this app's usage.
+      </p>
         <input type="text" id="repo-url-input" placeholder="https://github.com/user/repo.git">
         <div class="modal-buttons">
             <button id="modal-cancel-btn">Cancel</button>
@@ -129,7 +273,8 @@
 
   <div id="set-token-modal" class="modal-overlay">
     <div class="modal-content">
-        <p>Please enter your GitHub Personal Access Token (PAT). This is stored locally and used for all Git operations on private repositories.</p>
+        <p>Please enter your GitHub Personal Access Token (PAT).
+      This is stored locally and used for all Git operations on private repositories.</p>
         <input type="password" id="token-input" placeholder="ghp_...">
         <div class="modal-buttons">
             <button id="token-cancel-btn">Cancel</button>
@@ -137,6 +282,5 @@
         </div>
     </div>
   </div>
-
 </body>
 </html>

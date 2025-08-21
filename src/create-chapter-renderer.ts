@@ -1,8 +1,9 @@
 declare global {
   interface Window {
     api: {
-      onProjectDataForCreateChapter: (callback: (projectName: string) => void) => void;
+      onProjectDataForCreateChapter: (callback: (data: { repoName: string, projectName: string }) => void) => void;
       submitChapterCreation: (data: {
+        repoName: string;
         projectName: string;
         chapterNumber: string;
         chapterName: string;
@@ -13,6 +14,7 @@ declare global {
   }
 }
 
+let currentRepoName: string | null = null;
 let currentProjectName: string | null = null;
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -22,9 +24,10 @@ window.addEventListener('DOMContentLoaded', () => {
     const cancelBtn = document.getElementById('cancel-btn');
     const createBtn = document.getElementById('create-btn');
 
-    // 1. Receive the project name from the main process
-    window.api.onProjectDataForCreateChapter((projectName) => {
-        currentProjectName = projectName;
+    // 1. Receive both repoName and projectName from the main process
+    window.api.onProjectDataForCreateChapter((data) => {
+        currentRepoName = data.repoName;
+        currentProjectName = data.projectName;
     });
 
     // 2. Handle button clicks
@@ -37,7 +40,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const chapterName = nameInput.value.trim();
         const includeFinal = finalFolderCheckbox.checked;
 
-        if (!currentProjectName) {
+        if (!currentRepoName || !currentProjectName) {
             alert('Error: No project context found.');
             return;
         }
@@ -47,12 +50,12 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         const result = await window.api.submitChapterCreation({
+            repoName: currentRepoName, // Include repoName in the submission
             projectName: currentProjectName,
             chapterNumber,
             chapterName,
             includeFinal
         });
-
         // The main process will close the window on success
         if (!result.success) {
             // Error was already shown by the main process

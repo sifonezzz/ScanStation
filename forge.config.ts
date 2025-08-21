@@ -15,6 +15,16 @@ const config: ForgeConfig = {
       renderer: {
         config: './webpack.renderer.config.ts',
         entryPoints: [
+
+          // Inside the 'entryPoints' array in forge.config.ts
+          {
+            html: './src/splash.html',
+            js: './src/splash-renderer.ts',
+            name: 'splash_window',
+            preload: {
+              js: './src/preload.ts',
+            },
+          },
           {
             html: './src/index.html',
             js: './src/renderer.ts',

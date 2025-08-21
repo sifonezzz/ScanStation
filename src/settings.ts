@@ -19,3 +19,7 @@ export function setSetting(key: keyof AppStore, value: any): void {
 export function getSetting<T>(key: keyof AppStore): T | undefined {
   return store.get(key) as T | undefined;
 }
+
+export function deleteSetting(key: keyof AppStore): void {
+  store.delete(key);
+}

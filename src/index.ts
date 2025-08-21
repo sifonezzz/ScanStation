@@ -16,17 +16,44 @@ declare const CHAPTER_SCREEN_WINDOW_WEBPACK_ENTRY: string;
 declare const CHAPTER_SCREEN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 declare const CREATE_CHAPTER_WINDOW_WEBPACK_ENTRY: string;
 declare const CREATE_CHAPTER_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
+declare const SPLASH_WINDOW_WEBPACK_ENTRY: string;
+declare const SPLASH_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
+
 
 let createProjectWindow: BrowserWindow | null = null;
 let editProjectWindow: BrowserWindow | null = null;
 let chapterScreenWindow: BrowserWindow | null = null;
 let createChapterWindow: BrowserWindow | null = null;
 let lastWindowBounds: Electron.Rectangle = { width: 1024, height: 768, x: undefined, y: undefined };
+let splashWindow: BrowserWindow | null = null;
 
 
 function getRepoNameFromUrl(url: string): string | null {
     const match = url.match(/([^\/]+)\.git$/);
     return match ? match[1] : null;
+}
+
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 400,
+    height: 150,
+    backgroundColor: '#2c2f33',
+    frame: false,
+    resizable: false,
+    center: true,
+    webPreferences: {
+      preload: SPLASH_WINDOW_PRELOAD_WEBPACK_ENTRY,
+    },
+  });
+  splashWindow.loadURL(SPLASH_WINDOW_WEBPACK_ENTRY);
+  splashWindow.on('closed', () => (splashWindow = null));
+}
+
+
+function updateSplashStatus(message: string) {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.webContents.send('status-update', message);
+  }
 }
 
 async function loadProjects(mainWindow: BrowserWindow, repositoryName: string) {
@@ -60,6 +87,27 @@ async function loadProjects(mainWindow: BrowserWindow, repositoryName: string) {
         mainWindow.webContents.send('projects-loaded', []);
     }
   }
+}
+
+async function backupProjects() {
+    const sourcePath = getStoragePath();
+    // Creates the backup path as a sibling to the 'projects' folder
+    const backupPath = path.join(sourcePath, '..', 'backup');
+
+    try {
+        // Only run the backup if the projects folder actually exists
+        if (await fs.pathExists(sourcePath)) {
+            console.log(`Backing up projects from ${sourcePath} to ${backupPath}...`);
+            // This copies the directory, overwriting any existing backup
+            await fs.copy(sourcePath, backupPath, { overwrite: true });
+            console.log('Backup completed successfully.');
+        } else {
+            console.log('Projects folder not found, skipping backup.');
+        }
+    } catch (error) {
+        console.error('Failed to backup project folder:', error);
+        dialog.showErrorBox('Backup Failed', `Could not create a backup of the projects folder. Error: ${error.message}`);
+    }
 }
 
 async function refreshChapters(targetWindow: BrowserWindow, repoName: string, projectName: string) {
@@ -140,8 +188,10 @@ async function performAuthenticatedPush(git: SimpleGit) {
     }
     
     const originalUrl = origin.refs.push;
-    const authenticatedUrl = originalUrl.replace('https://', `https://${pat}@`);
-    
+    // CORRECTED LINE
+    const cleanUrl = originalUrl.replace(/^(https:\/\/)(?:.*@)?(.*)$/, '$1$2');
+    const authenticatedUrl = cleanUrl.replace('https://', `https://${pat}@`);
+
     try {
         await git.remote(['set-url', 'origin', authenticatedUrl]);
         await git.push('origin', 'main');
@@ -168,6 +218,61 @@ ipcMain.on('cancel-project-creation', () => {
   if (createProjectWindow) createProjectWindow.close();
 });
 
+ipcMain.handle('git-pull', async (_, repoName: string) => {
+    const repoPath = path.join(getStoragePath(), repoName);
+    const git = simpleGit(repoPath);
+    const pat = getSetting<string>('githubPat');
+
+    try {
+        const pullAction = async (gitInstance: SimpleGit) => {
+            try {
+                const pullSummary = await gitInstance.pull();
+                if (pullSummary.files.length === 0 && pullSummary.summary.changes === 0) {
+                    return { success: true, message: 'Repository is already up-to-date.' };
+                }
+                return { success: true, message: `Successfully pulled changes!\nFiles changed: ${pullSummary.summary.changes}` };
+            } catch (pullError) {
+                if (pullError.message.includes('refusing to merge unrelated histories')) {
+                    // Retry the pull with the flag that allows merging unrelated histories
+                    await gitInstance.pull(null, null, ['--allow-unrelated-histories']);
+                    return { success: true, message: 'Successfully merged unrelated histories from the remote repository.' };
+                }
+                // Re-throw any other type of pull error
+                throw pullError;
+            }
+        };
+
+        if (pat) {
+            const remotes = await git.getRemotes(true);
+            const origin = remotes.find(r => r.name === 'origin');
+            if (origin) {
+                const originalUrl = origin.refs.fetch;
+                const cleanUrl = originalUrl.replace(/^(https:\/\/)(?:.*@)?(.*)$/, '$1$2');
+                const authenticatedUrl = cleanUrl.replace('https://', `https://${pat}@`);
+                try {
+                    await git.remote(['set-url', 'origin', authenticatedUrl]);
+                    return await pullAction(git);
+                } finally {
+                    await git.remote(['set-url', 'origin', originalUrl]);
+                }
+            }
+        }
+        return await pullAction(git);
+    } catch (error) {
+        if (error.message.includes('Already up to date')) {
+             return { success: true, message: 'Repository is already up-to-date.' };
+        }
+        if (error.message.includes('no such ref was fetched')) {
+            throw new Error(
+                "Could not find the 'main' branch on the remote repository.\n\n" +
+                "This usually means the repository is empty. Please make an initial commit to the repository first."
+            );
+        }
+        console.error(`Failed to pull repository ${repoName}:`, error);
+        throw error;
+    }
+});
+
 ipcMain.on('submit-project-creation', async (_, { repoName, name, path: coverPath }) => {
   const projectPath = path.join(getStoragePath(), repoName, name);
   const projectExists = await fs.pathExists(projectPath);
@@ -176,25 +281,24 @@ ipcMain.on('submit-project-creation', async (_, { repoName, name, path: coverPat
     return;
   }
   await initializeNewProject(projectPath, coverPath);
-  if (createProjectWindow) createProjectWindow.close();
-  const mainWindow = BrowserWindow.getAllWindows()[0];
-  if (mainWindow) loadProjects(mainWindow, repoName);
+
+  // Get a direct reference to the main window from the modal's parent property
+  const mainWindow = createProjectWindow?.getParentWindow();
+
+  if (createProjectWindow) {
+    createProjectWindow.close();
+  }
+
+  // Use the direct reference to reload the projects
+  if (mainWindow) {
+    loadProjects(mainWindow, repoName);
+  }
 });
 
 ipcMain.on('open-project', (_, { repoName, projectName }) => {
     const mainWindow = BrowserWindow.getAllWindows()[0];
     if (mainWindow) {
-      lastWindowBounds = mainWindow.getBounds();
-      mainWindow.close();
-      chapterScreenWindow = new BrowserWindow({
-        ...lastWindowBounds, show: false, backgroundColor: '#23272a',
-        webPreferences: { preload: CHAPTER_SCREEN_WINDOW_PRELOAD_WEBPACK_ENTRY, },
-      });
-      chapterScreenWindow.once('ready-to-show', () => chapterScreenWindow.show());
-      chapterScreenWindow.webContents.once('dom-ready', () => {
-        chapterScreenWindow.webContents.send('project-data-for-chapter-screen', { repoName, projectName });
-      });
-      chapterScreenWindow.loadURL(CHAPTER_SCREEN_WINDOW_WEBPACK_ENTRY);
+        mainWindow.webContents.send('show-chapter-screen', { repoName, projectName });
     }
 });
 
@@ -254,10 +358,9 @@ ipcMain.handle('submit-project-update', async (_, data) => {
 });
 
 ipcMain.on('go-back-to-projects', () => {
-    if (chapterScreenWindow) {
-      lastWindowBounds = chapterScreenWindow.getBounds();
-      chapterScreenWindow.close();
-      createWindow();
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+    if (mainWindow) {
+        mainWindow.webContents.send('show-project-screen');
     }
 });
 
@@ -275,9 +378,10 @@ ipcMain.on('open-create-chapter-window', (_, { repoName, projectName }) => {
     });
     createChapterWindow.once('ready-to-show', () => createChapterWindow.show());
     createChapterWindow.webContents.once('dom-ready', () => {
+      // This line needs to send an object with both repoName and projectName
       createChapterWindow.webContents.send('project-data-for-create-chapter', { repoName, projectName });
     });
-    createChapterWindow.loadURL(CREATE_CHAPTER_WINDOW_WEBPACK_ENTRY);
+     createChapterWindow.loadURL(CREATE_CHAPTER_WINDOW_WEBPACK_ENTRY);
 });
 
 ipcMain.on('cancel-chapter-creation', () => {
@@ -355,7 +459,12 @@ ipcMain.handle('add-repository', async (_, repoUrl: string) => {
 
 ipcMain.handle('git-status', async (_, { repoName }) => {
     const repoPath = path.join(getStoragePath(), repoName);
-    return await simpleGit(repoPath).status();
+    const status = await simpleGit(repoPath).status();
+    // Instead of returning the whole complex object,
+    // we return a new, simple object with only the data we need.
+    return {
+        files: status.files,
+    };
 });
 
 ipcMain.handle('git-commit', async (_, { repoName, message }) => {
@@ -370,7 +479,7 @@ ipcMain.handle('get-pat-status', () => {
 });
 
 ipcMain.handle('remove-pat', () => {
-    setSetting('githubPat', undefined); // Using undefined deletes the key from settings
+    deleteSetting('githubPat');
 });
 
 ipcMain.handle('git-push', async (_, { repoName }) => {
@@ -383,18 +492,49 @@ ipcMain.handle('git-sync-repository', async (_, repoName: string) => {
     const repoPath = path.join(getStoragePath(), repoName);
     const git = simpleGit(repoPath);
 
-    const status = await git.status();
-    if (status.isClean()) {
-        return { success: true, message: 'Repository is already up-to-date.' };
+    try {
+        // First, commit any untracked or modified files
+        const preCommitStatus = await git.status();
+        if (!preCommitStatus.isClean()) {
+            await git.add('.');
+            await git.commit(`Sync: Scanstation auto-commit on ${new Date().toISOString()}`);
+        }
+
+        // Now, perform an authenticated fetch to get the latest remote state
+        const pat = getSetting<string>('githubPat');
+        if (pat) {
+            const remotes = await git.getRemotes(true);
+            const origin = remotes.find(r => r.name === 'origin');
+            if (origin) {
+                const originalUrl = origin.refs.fetch;
+                const cleanUrl = originalUrl.replace(/^(https:\/\/)(?:.*@)?(.*)$/, '$1$2');
+                const authenticatedUrl = cleanUrl.replace('https://', `https://${pat}@`);
+                try {
+                    await git.remote(['set-url', 'origin', authenticatedUrl]);
+                    await git.fetch();
+                } finally {
+                    await git.remote(['set-url', 'origin', originalUrl]);
+                }
+            }
+        } else {
+            // Fallback for public repositories
+            await git.fetch();
+        }
+        
+        const postCommitStatus = await git.status();
+
+        // Check if the local branch is ahead of the remote
+        if (postCommitStatus.ahead > 0) {
+            await performAuthenticatedPush(git); // This function already handles its own auth
+            return { success: true, message: 'Repository synced successfully!' };
+        } else {
+            return { success: true, message: 'Repository is already up-to-date.' };
+        }
+    } catch (error) {
+        console.error(`Failed to sync repository ${repoName}:`, error);
+        throw error; // Rethrow for the renderer to display the error
     }
-
-    await git.add('.');
-    await git.commit(`Sync: Scanstation auto-commit on ${new Date().toISOString()}`);
-    await performAuthenticatedPush(git);
-
-    return { success: true, message: 'Repository synced successfully.' };
 });
-
 
 function getStoragePath(): string {
   const customPath = getSetting<string>('projectStoragePath');
@@ -436,10 +576,16 @@ async function updateAllRepositories() {
                     const remotes = await git.getRemotes(true);
                     const origin = remotes.find(r => r.name === 'origin');
                     if (origin) {
-                        const authenticatedUrl = origin.refs.fetch.replace('https://', `https://${pat}@`);
-                        await git.remote(['set-url', 'origin', authenticatedUrl]);
-                        await git.pull();
-                        await git.remote(['set-url', 'origin', origin.refs.fetch]);
+                        const originalUrl = origin.refs.fetch;
+                        // CORRECTED LINE
+                        const cleanUrl = originalUrl.replace(/^(https:\/\/)(?:.*@)?(.*)$/, '$1$2');
+                        try {
+                            const authenticatedUrl = cleanUrl.replace('https://', `https://${pat}@`);
+                            await git.remote(['set-url', 'origin', authenticatedUrl]);
+                            await git.pull();
+                        } finally {
+                            await git.remote(['set-url', 'origin', originalUrl]);
+                        }
                     }
                 } else {
                     await git.pull();
@@ -452,18 +598,28 @@ async function updateAllRepositories() {
     console.log('Repository update check finished.');
 }
 
-const createWindow = () => {
+const createWindow = (): BrowserWindow => {
   const mainWindow = new BrowserWindow({
-    ...lastWindowBounds, show: false, backgroundColor: '#23272a',
-    webPreferences: { preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY, },
+    ...lastWindowBounds,
+    show: false, // The main window will start hidden
+    backgroundColor: '#23272a',
+    webPreferences: {
+      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
+    },
   });
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-    const selectedRepo = getSetting<string>('selectedRepository');
-    loadProjects(mainWindow, selectedRepo);
-  });
+
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+  
+  mainWindow.once('ready-to-show', () => {
+    const selectedRepo = getSetting<string>('selectedRepository');
+    if (selectedRepo) {
+      loadProjects(mainWindow, selectedRepo);
+    }
+  });
+
+  return mainWindow;
 };
+
 
 app.whenReady().then(async () => {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -486,12 +642,31 @@ app.whenReady().then(async () => {
     }
   });
 
+  createSplashWindow();
+
   await handleFirstBoot();
+
+  updateSplashStatus('Backing up current user folder...');
+  await backupProjects();
+
+  updateSplashStatus('Pulling changes from repositories...');
   await updateAllRepositories();
-  createWindow();
+
+  updateSplashStatus('Done!');
+  const mainWindow = createWindow();
+  
+  setTimeout(() => {
+    if (splashWindow && !splashWindow.isDestroyed()) {
+        splashWindow.close();
+    }
+    mainWindow.show();
+  }, 1200); // A short delay to show "Done!"
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      const mw = createWindow();
+      mw.show();
+    }
   });
 });
 

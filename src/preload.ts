@@ -7,6 +7,13 @@ contextBridge.exposeInMainWorld('api', {
   deleteProject: (repoName, projectName) => ipcRenderer.invoke('delete-project', { repoName, projectName }),
   openEditProjectWindow: (repoName, projectName) => ipcRenderer.send('open-edit-project-window', { repoName, projectName }),
 
+  // Add this with your other API definitions
+  onStatusUpdate: (callback) => ipcRenderer.on('status-update', (_event, message) => callback(message)),
+
+  // ... inside the api object
+  onShowChapterScreen: (callback) => ipcRenderer.on('show-chapter-screen', (_event, data) => callback(data)),
+  onShowProjectScreen: (callback) => ipcRenderer.on('show-project-screen', (_event) => callback()),
+
   // --- Create Project Window ---
   createProject: (repoName) => ipcRenderer.send('open-create-project-window', repoName),
   onProjectDataForCreateProject: (callback) => ipcRenderer.on('project-data-for-create-project', (_event, data) => callback(data)),
@@ -41,6 +48,7 @@ contextBridge.exposeInMainWorld('api', {
   gitStatus: (repoName) => ipcRenderer.invoke('git-status', { repoName }),
   gitCommit: (repoName, message) => ipcRenderer.invoke('git-commit', { repoName, message }),
   gitPush: (repoName) => ipcRenderer.invoke('git-push', { repoName }),
+  gitPull: (repoName) => ipcRenderer.invoke('git-pull', repoName),
   gitSyncRepository: (repoName) => ipcRenderer.invoke('git-sync-repository', repoName),
 
   // --- Universal APIs (Used by multiple windows) ---
