@@ -219,9 +219,8 @@
         <button id="push-repo-btn">Push Repository</button>
       </div>
       <div class="header-buttons">
-        <button id="set-token-btn">Set Token</button>
+        <button id="settings-btn">Settings</button>
         <button id="edit-btn">Edit</button>
-        <button id="add-repo-btn">+ Add Repository</button>
         <button id="create-project-btn">+ New Project</button>
       </div>
     </div>
@@ -256,31 +255,6 @@
     <div id="chapter-grid"></div>
   </div>
 
-  <div id="add-repo-modal" class="modal-overlay">
-    <div class="modal-content">
-      <p>This function requires a created repository before working. After that, place the link in the text box below.
-      <br><br>
-          Please note that the owner of the repository has to give you permission to modify its files for the app to work correctly.
-      Check the Scanstation repository for more information on this app's usage.
-      </p>
-        <input type="text" id="repo-url-input" placeholder="https://github.com/user/repo.git">
-        <div class="modal-buttons">
-            <button id="modal-cancel-btn">Cancel</button>
-            <button id="modal-pull-btn">Pull Files</button>
-        </div>
-    </div>
-  </div>
-
-  <div id="set-token-modal" class="modal-overlay">
-    <div class="modal-content">
-        <p>Please enter your GitHub Personal Access Token (PAT).
-      This is stored locally and used for all Git operations on private repositories.</p>
-        <input type="password" id="token-input" placeholder="ghp_...">
-        <div class="modal-buttons">
-            <button id="token-cancel-btn">Cancel</button>
-            <button id="token-save-btn">Save Token</button>
-        </div>
-    </div>
-  </div>
+  
 </body>
 </html>

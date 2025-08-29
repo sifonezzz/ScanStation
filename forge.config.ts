@@ -25,6 +25,15 @@ const config: ForgeConfig = {
               js: './src/preload.ts',
             },
           },
+          // Add this block inside the entryPoints array
+          {
+              html: './src/settings.html',
+              js: './src/settings-renderer.ts',
+              name: 'settings_window',
+              preload: {
+                js: './src/preload.ts',
+              },
+          },
           {
             html: './src/index.html',
             js: './src/renderer.ts',

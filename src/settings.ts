@@ -4,10 +4,14 @@ import * as Store from 'electron-store';
 interface AppStore {
   initialSetupComplete?: boolean;
   projectStoragePath?: string;
-  githubToken?: string; // This is for the OAuth login state
-  githubPat?: string; // Add this line for the Personal Access Token
+  githubToken?: string;
+  githubPat?: string;
   repositories?: string[];
   selectedRepository?: string;
+  // Paths to external editors
+  photoshopPath?: string;
+  illustratorPath?: string;
+  gimpPath?: string;
 }
 
 const store: any = new (Store as any).default();

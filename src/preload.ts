@@ -15,6 +15,14 @@ contextBridge.exposeInMainWorld('api', {
   saveTranslationData: (data) => ipcRenderer.invoke('save-translation-data', data),
   saveProofreadData: (data) => ipcRenderer.invoke('save-proofread-data', data),
   markPageCorrect: (data) => ipcRenderer.invoke('mark-page-correct', data),
+  openFileInEditor: (data) => ipcRenderer.invoke('open-file-in-editor', data),
+
+  // --- Settings Window ---
+openSettingsWindow: () => ipcRenderer.send('open-settings-window'),
+closeSettingsWindow: () => ipcRenderer.send('close-settings-window'),
+getEditorPaths: () => ipcRenderer.invoke('get-editor-paths'),
+selectEditorPath: () => ipcRenderer.invoke('select-editor-path'),
+setEditorPath: (data) => ipcRenderer.invoke('set-editor-path', data),
 
   // Add this with your other API definitions
   onStatusUpdate: (callback) => ipcRenderer.on('status-update', (_event, message) => callback(message)),

@@ -56,18 +56,10 @@ window.addEventListener('DOMContentLoaded', () => {
   const editBtn = document.getElementById('edit-btn');
   projectGrid = document.getElementById('project-grid');
   const repoDropdown = document.getElementById('repo-dropdown') as HTMLSelectElement;
-  const addRepoBtn = document.getElementById('add-repo-btn');
+  
   const pushRepoBtn = document.getElementById('push-repo-btn');
   const pullRepoBtn = document.getElementById('pull-repo-btn');
-  const setTokenBtn = document.getElementById('set-token-btn');
-  const addRepoModal = document.getElementById('add-repo-modal');
-  const modalCancelBtn = document.getElementById('modal-cancel-btn');
-  const modalPullBtn = document.getElementById('modal-pull-btn');
-  const repoUrlInput = document.getElementById('repo-url-input') as HTMLInputElement;
-  const setTokenModal = document.getElementById('set-token-modal');
-  const tokenInput = document.getElementById('token-input') as HTMLInputElement;
-  const tokenCancelBtn = document.getElementById('token-cancel-btn');
-  const tokenSaveBtn = document.getElementById('token-save-btn');
+  const settingsBtn = document.getElementById('settings-btn');
 
   // --- Elements for Chapter Screen ---
   const projectNameHeader = document.getElementById('project-name-header');
@@ -111,6 +103,10 @@ window.addEventListener('DOMContentLoaded', () => {
           window.api.openCreateChapterWindow(currentRepoName, currentProjectName);
       }
   });
+
+  settingsBtn.addEventListener('click', () => {
+    window.api.openSettingsWindow();
+});
 
   backBtn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -166,29 +162,17 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // --- PROJECT SCREEN LOGIC ---
   async function initialize() {
-    hasPat = await window.api.getPatStatus();
-    updateSetTokenButton();
-
     const { repositories, selected } = await window.api.getRepositories();
     currentRepositories = repositories;
     selectedRepository = selected;
     updateRepoDropdown();
     if (selectedRepository) {
-      window.api.loadProjects(selectedRepository);
+        window.api.loadProjects(selectedRepository);
     } else {
-		projectGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">Please add a repository to get started!</p>`;
+        projectGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">Please add a repository and select it to get started!</p>`;
     }
-  }
+}
 
-  function updateSetTokenButton() {
-    if (hasPat) {
-        setTokenBtn.textContent = 'Remove Token';
-        setTokenBtn.style.backgroundColor = '#f04747'; // Red color
-    } else {
-        setTokenBtn.textContent = 'Set Token';
-        setTokenBtn.style.backgroundColor = ''; // Default color
-    }
-  }
 
   function updateRepoDropdown() {
     repoDropdown.innerHTML = '';
@@ -215,17 +199,7 @@ window.addEventListener('DOMContentLoaded', () => {
     window.api.createProject(selectedRepository);
   });
 
-  editBtn.addEventListener('click', () => {
-    isEditMode = !isEditMode;
-    projectGrid.classList.toggle('edit-mode');
-    if (isEditMode) {
-      editBtn.textContent = 'Done';
-      editBtn.style.backgroundColor = '#7289da';
-    } else {
-      editBtn.textContent = 'Edit';
-      editBtn.style.backgroundColor = '';
-    }
-  });
+  
 
   pushRepoBtn.addEventListener('click', async () => {
     if (!selectedRepository) {
@@ -266,32 +240,8 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  setTokenBtn.addEventListener('click', async () => {
-    if (hasPat) {
-        await window.api.removePat();
-        hasPat = false;
-        alert('Access token removed successfully.');
-        updateSetTokenButton();
-    } else {
-        tokenInput.value = '';
-        setTokenModal.style.display = 'flex';
-    }
-  });
-
-  tokenCancelBtn.addEventListener('click', () => {
-    setTokenModal.style.display = 'none';
-  });
-
-  tokenSaveBtn.addEventListener('click', async () => {
-    const token = tokenInput.value.trim();
-    if (token) {
-        await window.api.setPat(token);
-        hasPat = true;
-        alert("Access token saved successfully!");
-        updateSetTokenButton();
-        setTokenModal.style.display = 'none';
-    }
-  });
+  
+ 
 
   repoDropdown.addEventListener('change', () => {
     const newRepo = repoDropdown.value;
@@ -299,37 +249,7 @@ window.addEventListener('DOMContentLoaded', () => {
     window.api.setSelectedRepository(newRepo);
   });
 
-  addRepoBtn.addEventListener('click', () => {
-    repoUrlInput.value = '';
-    addRepoModal.style.display = 'flex';
-  });
-
-  modalCancelBtn.addEventListener('click', () => {
-    addRepoModal.style.display = 'none';
-  });
-
-  modalPullBtn.addEventListener('click', async () => {
-    const url = repoUrlInput.value.trim();
-    if (!url) return;
-    
-    modalPullBtn.textContent = 'Pulling...';
-    modalPullBtn.setAttribute('disabled', 'true');
-
-    const result = await window.api.addRepository(url);
-    if (result.success) {
-      if (!currentRepositories.includes(result.repoName)) {
-        currentRepositories.push(result.repoName);
-      }
-      selectedRepository = result.repoName;
-      updateRepoDropdown();
-      window.api.setSelectedRepository(result.repoName);
-      addRepoModal.style.display = 'none';
-    }
-
-    modalPullBtn.textContent = 'Pull Files';
-    modalPullBtn.removeAttribute('disabled');
-    repoUrlInput.value = '';
-  });
+  
 
   window.api.onProjectsLoaded((projects) => {
     projectGrid.innerHTML = '';

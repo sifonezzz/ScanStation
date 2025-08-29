@@ -1,36 +1,29 @@
 import translateViewHtml from './translate-view.html';
 import proofreadViewHtml from './proofread-view.html';
+import typesetViewHtml from './typeset-view.html';
 
 // --- Type Definitions ---
-interface PageStatus {
-  CL: boolean;
-  TL: boolean;
-  TS: boolean;
-  PR: boolean | 'annotated';
-  QC: boolean | 'annotated';
-}
-interface Page {
-  fileName: string;
-  status: PageStatus;
-}
+interface PageStatus { CL: boolean; TL: boolean; TS: boolean; PR: boolean | 'annotated'; QC: boolean | 'annotated'; }
+interface Page { fileName: string; status: PageStatus; }
 type DrawingData = { lines: { color: string; points: { x: number; y: number }[] }[] };
 
 // --- Module State ---
-let currentRepoName: string | null = null;
-let currentProjectName: string | null = null;
-let currentChapterPath: string | null = null;
+let currentRepoName: string | null = null, currentProjectName: string | null = null, currentChapterPath: string | null = null;
 let pages: Page[] = [];
+let activeView: { name: string; saveData: () => Promise<void> } = { name: 'none', saveData: async () => {} };
 
 // --- DOM Elements ---
-let projectNameHeader: HTMLElement, backBtn: HTMLElement, openFolderBtn: HTMLElement, homeBtn: HTMLElement, translateBtn: HTMLElement, proofreadBtn: HTMLElement, galleryViewContainer: HTMLElement, workspacePlaceholder: HTMLElement, pageListDiv: HTMLElement;
+let projectNameHeader: HTMLElement, backBtn: HTMLElement, openFolderBtn: HTMLElement, homeBtn: HTMLElement, translateBtn: HTMLElement, proofreadBtn: HTMLElement, typesetBtn: HTMLElement, galleryViewContainer: HTMLElement, workspacePlaceholder: HTMLElement, pageListDiv: HTMLElement;
+
 // --- Main Setup ---
 window.addEventListener('DOMContentLoaded', () => {
   projectNameHeader = document.getElementById('project-name-header');
-  proofreadBtn = document.getElementById('proofread-btn');
   backBtn = document.getElementById('back-to-projects-btn');
   openFolderBtn = document.getElementById('open-folder-btn');
   homeBtn = document.getElementById('home-btn');
   translateBtn = document.getElementById('translate-btn');
+  proofreadBtn = document.getElementById('proofread-btn');
+  typesetBtn = document.getElementById('typeset-btn');
   galleryViewContainer = document.getElementById('gallery-view-container');
   workspacePlaceholder = document.getElementById('workspace-placeholder');
   pageListDiv = document.getElementById('page-list');
@@ -41,27 +34,37 @@ window.addEventListener('DOMContentLoaded', () => {
     projectNameHeader.textContent = `${data.projectName} / ${data.chapterName}`;
     currentChapterPath = data.chapterPath;
     await loadAndRenderPageStatus();
+    showHomeView(); // Show dashboard on load
   });
 
-  proofreadBtn.addEventListener('click', () => {
-  // Find the first page with annotations, or default to the first page
-  const firstAnnotatedPage = pages.findIndex(p => p.status.PR === 'annotated');
-  showProofreadView(firstAnnotatedPage >= 0 ? firstAnnotatedPage : 0);
-    });
   backBtn.addEventListener('click', (e) => { e.preventDefault(); window.api.goBackToProjects(currentRepoName, currentProjectName); });
   openFolderBtn.addEventListener('click', (e) => { e.preventDefault(); if (currentChapterPath) window.api.openChapterFolder(currentChapterPath); });
-  homeBtn.addEventListener('click', (e) => { e.preventDefault(); showPlaceholder("Welcome to the chapter home screen."); });
-  translateBtn.addEventListener('click', showTranslateView);
+  
+  homeBtn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    await activeView.saveData();
+    showHomeView();
+  });
+  translateBtn.addEventListener('click', async () => {
+    await activeView.saveData();
+    showTranslateView(0);
+  });
+  proofreadBtn.addEventListener('click', async () => {
+    await activeView.saveData();
+    const firstAnnotatedPage = pages.findIndex(p => p.status.PR === 'annotated');
+    showProofreadView(firstAnnotatedPage >= 0 ? firstAnnotatedPage : 0);
+  });
+  typesetBtn.addEventListener('click', async () => {
+    await activeView.saveData();
+    showTypesetView(0);
+  });
 });
 
-// --- Core Sidebar/Status Functions ---
+// --- Core Sidebar/Status & View Loading ---
 async function loadAndRenderPageStatus() {
   if (!currentChapterPath) return;
   const result = await window.api.getChapterPageStatus(currentChapterPath);
-  if (result.success) {
-    pages = result.pages;
-    renderSidebar();
-  }
+  if (result.success) { pages = result.pages; renderSidebar(); }
 }
 
 function renderSidebar() {
@@ -72,13 +75,10 @@ function renderSidebar() {
     item.className = 'page-status-item';
     item.id = `page-item-${page.fileName}`;
     item.innerHTML = `<span class="page-name">${index + 1}: ${page.fileName}</span><div class="status-tags">${createStatusTag('CL', page.status.CL)}${createStatusTag('TL', page.status.TL)}${createStatusTag('TS', page.status.TS)}${createStatusTag('PR', page.status.PR)}${createStatusTag('QC', page.status.QC)}</div>`;
-    
-    // Only make the item clickable if it has annotations
     if (page.status.PR === 'annotated') {
       item.classList.add('clickable');
       item.addEventListener('click', () => showProofreadView(index));
     }
-    
     pageListDiv.appendChild(item);
   });
 }
@@ -90,20 +90,34 @@ function createStatusTag(name: string, status: boolean | 'annotated'): string {
   return `<span class="${className}">${name}</span>`;
 }
 
-// --- View Loaders & Teardown ---
-function showPlaceholder(message?: string) {
-  galleryViewContainer.style.display = 'none';
-  galleryViewContainer.innerHTML = '';
-  workspacePlaceholder.textContent = message || 'Select an action like "Translate" or click a page to begin.';
-  workspacePlaceholder.style.display = 'block';
+function showHomeView() {
+    galleryViewContainer.style.display = 'none';
+    galleryViewContainer.innerHTML = '';
+    workspacePlaceholder.style.display = 'flex';
+    activeView = { name: 'home', saveData: async () => {} };
+    if (pages.length === 0) {
+        workspacePlaceholder.innerHTML = 'No pages found in "Raws" folder to generate a dashboard.';
+        return;
+    }
+    const total = pages.length;
+    const clCount = pages.filter(p => p.status.CL).length;
+    const tlCount = pages.filter(p => p.status.TL).length;
+    const tsCount = pages.filter(p => p.status.TS).length;
+    const prCount = pages.filter(p => p.status.PR === true).length;
+    workspacePlaceholder.innerHTML = `<div class="dashboard-container"><h2>Chapter Progress</h2>${createProgressBar("Cleaning (CL)", clCount, total)}${createProgressBar("Translation (TL)", tlCount, total)}${createProgressBar("Typesetting (TS)", tsCount, total)}${createProgressBar("Proofreading (PR)", prCount, total)}</div>`;
 }
 
-function showTranslateView() {
+function createProgressBar(label: string, count: number, total: number) {
+    const percent = total > 0 ? (count / total) * 100 : 0;
+    return `<div class="progress-item"><div class="progress-label"><span>${label}</span><span>${count} / ${total}</span></div><div class="progress-bar-background"><div class="progress-bar-foreground" style="width: ${percent}%;">${Math.round(percent)}%</div></div></div>`;
+}
+
+function showTranslateView(startingIndex: number) {
   if (pages.length === 0) { alert('There are no pages in the "Raws" folder to translate.'); return; }
   galleryViewContainer.innerHTML = translateViewHtml;
   workspacePlaceholder.style.display = 'none';
   galleryViewContainer.style.display = 'flex';
-  initTranslateView();
+  initTranslateView(startingIndex);
 }
 
 function showProofreadView(startingIndex: number) {
@@ -114,9 +128,17 @@ function showProofreadView(startingIndex: number) {
   initProofreadView(startingIndex);
 }
 
-// --- Translation View Logic ---
-function initTranslateView() {
-  let currentPageIndex = 0;
+function showTypesetView(startingIndex: number) {
+  if (pages.length === 0) { alert('There are no pages to typeset.'); return; }
+  galleryViewContainer.innerHTML = typesetViewHtml;
+  workspacePlaceholder.style.display = 'none';
+  galleryViewContainer.style.display = 'flex';
+  initTypesetView(startingIndex);
+}
+
+// --- View Initializers ---
+function initTranslateView(startingIndex: number) {
+  let currentPageIndex = startingIndex;
   const pageIndicator = document.getElementById('translate-page-indicator') as HTMLSpanElement;
   const rawImage = document.getElementById('translate-raw-image') as HTMLImageElement;
   const translationText = document.getElementById('translation-text') as HTMLTextAreaElement;
@@ -139,9 +161,11 @@ function initTranslateView() {
     }
   };
 
+  activeView = { name: 'translate', saveData };
+
   const loadPage = async (index: number) => {
     if (index < 0 || index >= pages.length) return;
-    if (pages[currentPageIndex]) { await saveData(); }
+    if (pages[currentPageIndex] && currentPageIndex !== index) { await saveData(); }
     currentPageIndex = index;
     const page = pages[currentPageIndex];
     pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
@@ -154,8 +178,15 @@ function initTranslateView() {
   };
 
   const redrawCanvas = () => {
-    canvas.width = rawImage.clientWidth;
-    canvas.height = rawImage.clientHeight;
+    if (!rawImage.clientWidth || !rawImage.clientHeight) return;
+    const imgRect = rawImage.getBoundingClientRect();
+    const parentRect = rawImage.parentElement.getBoundingClientRect();
+    canvas.style.top = `${imgRect.top - parentRect.top}px`;
+    canvas.style.left = `${imgRect.left - parentRect.left}px`;
+    canvas.style.width = `${imgRect.width}px`;
+    canvas.style.height = `${imgRect.height}px`;
+    canvas.width = imgRect.width;
+    canvas.height = imgRect.height;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.strokeStyle = 'red';
     ctx.lineWidth = 2;
@@ -165,32 +196,28 @@ function initTranslateView() {
       if (line.points.length < 2) return;
       ctx.beginPath();
       ctx.moveTo(line.points[0].x * canvas.width, line.points[0].y * canvas.height);
-      for (let i = 1; i < line.points.length; i++) {
-        ctx.lineTo(line.points[i].x * canvas.width, line.points[i].y * canvas.height);
-      }
+      for (let i = 1; i < line.points.length; i++) { ctx.lineTo(line.points[i].x * canvas.width, line.points[i].y * canvas.height); }
       ctx.stroke();
     });
   };
 
   const getMousePos = (e: MouseEvent) => ({ x: (e.clientX - canvas.getBoundingClientRect().left), y: (e.clientY - canvas.getBoundingClientRect().top) });
 
-  closeBtn.addEventListener('click', async (e) => { e.preventDefault(); await saveData(); showPlaceholder(); });
+  closeBtn.addEventListener('click', async (e) => { e.preventDefault(); await saveData(); showHomeView(); });
   nextBtn.addEventListener('click', () => loadPage(currentPageIndex + 1));
   prevBtn.addEventListener('click', () => loadPage(currentPageIndex - 1));
   rawImage.onload = redrawCanvas;
   window.addEventListener('resize', redrawCanvas);
-  translationText.addEventListener('blur', saveData);
 
   canvas.addEventListener('mousedown', (e) => { isDrawing = true; currentLine = []; const pos = getMousePos(e); currentLine.push({ x: pos.x / canvas.width, y: pos.y / canvas.height }); });
-  canvas.addEventListener('mousemove', (e) => { if (!isDrawing) return; const pos = getMousePos(e); currentLine.push({ x: pos.x / canvas.width, y: pos.y / canvas.height }); ctx.beginPath(); const lastPoint = currentLine[currentLine.length - 2]; ctx.moveTo(lastPoint.x * canvas.width, lastPoint.y * canvas.height); ctx.lineTo(pos.x, pos.y); ctx.stroke(); });
+  canvas.addEventListener('mousemove', (e) => { if (!isDrawing) return; const pos = getMousePos(e); currentLine.push({ x: pos.x / canvas.width, y: pos.y / canvas.height }); ctx.beginPath(); const lastPoint = currentLine[currentLine.length - 2]; if(!lastPoint) return; ctx.moveTo(lastPoint.x * canvas.width, lastPoint.y * canvas.height); ctx.lineTo(pos.x, pos.y); ctx.stroke(); });
   const endDrawing = () => { if (!isDrawing) return; isDrawing = false; if (currentLine.length > 1) { drawingData.lines.push({ color: 'red', points: currentLine }); } saveData(); };
   canvas.addEventListener('mouseup', endDrawing);
   canvas.addEventListener('mouseleave', endDrawing);
 
-  loadPage(0);
+  loadPage(startingIndex);
 }
 
-// --- Proofread View Logic ---
 function initProofreadView(startingIndex: number) {
   let currentPageIndex = startingIndex;
   const pageIndicator = document.getElementById('proofread-page-indicator') as HTMLSpanElement;
@@ -202,77 +229,89 @@ function initProofreadView(startingIndex: number) {
   const correctBtn = document.getElementById('proofread-correct-btn') as HTMLButtonElement;
   const closeBtn = document.querySelector('.gallery-close-btn') as HTMLAnchorElement;
 
-  // This helper function now handles saving the annotations for a specific page index
-  const saveAnnotations = async (indexToSave: number) => {
-    if (!pages[indexToSave]) return; // Don't save if index is invalid
-    
-    const pageFile = pages[indexToSave].fileName;
-    const result = await window.api.saveProofreadData({
-      chapterPath: currentChapterPath,
-      pageFile,
-      annotations: annotationsText.value
-    });
-
+  const saveAnnotations = async () => {
+    if (!pages[currentPageIndex]) return;
+    const pageFile = pages[currentPageIndex].fileName;
+    const result = await window.api.saveProofreadData({ chapterPath: currentChapterPath, pageFile, annotations: annotationsText.value });
     if (result.success) {
-      pages[indexToSave].status = { ...pages[indexToSave].status, ...result.newStatus };
+      pages[currentPageIndex].status = { ...pages[currentPageIndex].status, ...result.newStatus };
       renderSidebar();
     } else if (result.error) {
       alert(`Could not save annotations: ${result.error}`);
     }
   };
 
+  activeView = { name: 'proofread', saveData: saveAnnotations };
+
   const loadPage = async (index: number) => {
     if (index < 0 || index >= pages.length) return;
-
-    // Save the data for the page we are leaving BEFORE loading the new one
-    if (currentPageIndex !== index && pages[currentPageIndex]) {
-        await saveAnnotations(currentPageIndex);
-    }
-    
+    if (currentPageIndex !== index && pages[currentPageIndex]) { await saveAnnotations(); }
     currentPageIndex = index;
     const page = pages[currentPageIndex];
-
     pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
-    
     const rawPath = `${currentChapterPath}/Raws/${page.fileName}`.replace(/\\/g, '/');
     rawImage.src = `scanstation-asset:///${rawPath}`;
-
     const tsPath = `${currentChapterPath}/Typesetted/${page.fileName}`.replace(/\\/g, '/');
     tsImage.src = `scanstation-asset:///${tsPath}`;
-    tsImage.onerror = () => { tsImage.src = ''; }; // Handles missing typeset files
-    
+    tsImage.onerror = () => { tsImage.src = ''; };
     const annotations = await window.api.getFileContent(`${currentChapterPath}/data/PR Data/${page.fileName}_proof.txt`);
     annotationsText.value = annotations;
   };
 
-  // --- Event Listeners ---
-  closeBtn.addEventListener('click', async (e) => {
-    e.preventDefault();
-    await saveAnnotations(currentPageIndex); // Save one last time
-    showPlaceholder();
-  });
-
+  closeBtn.addEventListener('click', async (e) => { e.preventDefault(); await saveAnnotations(); showHomeView(); });
   nextBtn.addEventListener('click', () => loadPage(currentPageIndex + 1));
   prevBtn.addEventListener('click', () => loadPage(currentPageIndex - 1));
   
   correctBtn.addEventListener('click', async () => {
-    await saveAnnotations(currentPageIndex); // Save any final annotations first
-    
+    await saveAnnotations();
     const pageFile = pages[currentPageIndex].fileName;
     const result = await window.api.markPageCorrect({ chapterPath: currentChapterPath, pageFile });
-    
     if (result.success) {
       pages[currentPageIndex].status = { ...pages[currentPageIndex].status, ...result.newStatus };
       renderSidebar();
       annotationsText.value = '';
-      if (currentPageIndex < pages.length - 1) {
-        loadPage(currentPageIndex + 1);
-      }
+      if (currentPageIndex < pages.length - 1) { loadPage(currentPageIndex + 1); } else { showHomeView(); }
     } else {
       alert(`Could not mark page as correct: ${result.error}`);
     }
   });
 
-  // Initial page load
+  loadPage(startingIndex);
+}
+
+function initTypesetView(startingIndex: number) {
+  let currentPageIndex = startingIndex;
+  activeView = { name: 'typeset', saveData: async () => {} };
+  const pageIndicator = document.getElementById('typeset-page-indicator') as HTMLSpanElement;
+  const cleanedImage = document.getElementById('typeset-cleaned-image') as HTMLImageElement;
+  const translationTextDiv = document.getElementById('typeset-translation-text') as HTMLDivElement;
+  const nextBtn = document.getElementById('typeset-next-btn') as HTMLButtonElement;
+  const prevBtn = document.getElementById('typeset-prev-btn') as HTMLButtonElement;
+  const closeBtn = document.querySelector('.gallery-close-btn') as HTMLAnchorElement;
+
+  const loadPage = async (index: number) => {
+    if (index < 0 || index >= pages.length) return;
+    currentPageIndex = index;
+    const page = pages[currentPageIndex];
+    pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
+    const cleanedPath = `${currentChapterPath}/Raws Cleaned/${page.fileName}`.replace(/\\/g, '/');
+    cleanedImage.src = `scanstation-asset:///${cleanedPath}`;
+    cleanedImage.onerror = () => { cleanedImage.src = ''; };
+    const translatedText = await window.api.getFileContent(`${currentChapterPath}/data/TL Data/${page.fileName}.txt`);
+    translationTextDiv.textContent = translatedText || 'No translation text found for this page.';
+  };
+
+  closeBtn.addEventListener('click', (e) => { e.preventDefault(); showHomeView(); });
+  nextBtn.addEventListener('click', () => loadPage(currentPageIndex + 1));
+  prevBtn.addEventListener('click', () => loadPage(currentPageIndex - 1));
+
+  document.querySelectorAll('.external-editor-buttons button').forEach(button => {
+    button.addEventListener('click', () => {
+      const editor = (button as HTMLElement).dataset.editor;
+      const filePath = `${currentChapterPath}/Raws Cleaned/${pages[currentPageIndex].fileName}`;
+      window.api.openFileInEditor({ editor, filePath });
+    });
+  });
+
   loadPage(startingIndex);
 }

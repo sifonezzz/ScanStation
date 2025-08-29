@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <title>Settings</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 24px; background-color: #2c2f33; color: #ffffff; -webkit-app-region: drag; }
+        .form-container { -webkit-app-region: no-drag; }
+        h2 { text-align: center; margin-top: 0; }
+        h3 { margin-top: 30px; border-bottom: 1px solid #4a4d52; padding-bottom: 8px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; }
+        .path-control { display: flex; gap: 10px; }
+        .path-input { flex-grow: 1; padding: 8px; font-size: 14px; border-radius: 4px; border: 1px solid #4a4d52; background-color: #23272a; color: #ffffff; box-sizing: border-box; }
+        .browse-btn, .action-btn { padding: 8px 16px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; background-color: #4a4d52; color: white; }
+        .button-group { display: flex; justify-content: flex-end; margin-top: 30px; }
+        #done-btn { background-color: #7289da; color: white; padding: 10px 20px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: #2c2f33; padding: 25px; border-radius: 8px; width: 90%; max-width: 500px; text-align: center; }
+        .modal-content p { color: #99aab5; line-height: 1.5; }
+        .modal-content input { width: 100%; padding: 10px; margin: 15px 0; box-sizing: border-box; }
+        .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>Settings</h2>
+        
+        <h3>Repository Management</h3>
+        <button id="add-repo-btn" class="action-btn">+ Add Repository</button>
+
+        <h3>Token Management</h3>
+        <button id="set-token-btn" class="action-btn">Set Token</button>
+
+        <h3>External Editor Paths</h3>
+        <div class="form-group">
+            <label>Adobe Photoshop Path</label>
+            <div class="path-control">
+                <input type="text" id="photoshopPath" class="path-input" readonly placeholder="Not set">
+                <button class="browse-btn" data-editor="photoshop">Browse...</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Adobe Illustrator Path</label>
+            <div class="path-control">
+                <input type="text" id="illustratorPath" class="path-input" readonly placeholder="Not set">
+                <button class="browse-btn" data-editor="illustrator">Browse...</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>GIMP Path</label>
+            <div class="path-control">
+                <input type="text" id="gimpPath" class="path-input" readonly placeholder="Not set">
+                <button class="browse-btn" data-editor="gimp">Browse...</button>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button id="done-btn">Done</button>
+        </div>
+    </div>
+
+    <div id="add-repo-modal" class="modal-overlay">
+        <div class="modal-content"><p>Place the repository link in the text box below. <br><br> Please note that the owner of the repository must give you permission to modify its files.</p><input type="text" id="repo-url-input" placeholder="https://github.com/user/repo.git"><div class="modal-buttons"><button id="modal-cancel-btn">Cancel</button><button id="modal-pull-btn">Pull Files</button></div></div>
+    </div>
+    <div id="set-token-modal" class="modal-overlay">
+        <div class="modal-content"><p>Please enter your GitHub Personal Access Token (PAT). This is stored locally and used for all Git operations.</p><input type="password" id="token-input" placeholder="ghp_..."><div class="modal-buttons"><button id="token-cancel-btn">Cancel</button><button id="token-save-btn">Save Token</button></div></div>
+    </div>
+</body>
+</html>

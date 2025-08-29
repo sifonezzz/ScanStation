@@ -4,6 +4,7 @@ import fs from 'fs-extra';
 import simpleGit, { SimpleGit } from 'simple-git';
 import sharp from 'sharp';
 import { getSetting, setSetting } from './settings';
+import { execFile } from 'child_process';
 
 // Declare the entry points for Webpack.
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
@@ -18,6 +19,8 @@ declare const CREATE_CHAPTER_WINDOW_WEBPACK_ENTRY: string;
 declare const CREATE_CHAPTER_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 declare const SPLASH_WINDOW_WEBPACK_ENTRY: string;
 declare const SPLASH_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
+declare const SETTINGS_WINDOW_WEBPACK_ENTRY: string;
+declare const SETTINGS_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 
 let createProjectWindow: BrowserWindow | null = null;
@@ -26,6 +29,7 @@ let chapterScreenWindow: BrowserWindow | null = null;
 let createChapterWindow: BrowserWindow | null = null;
 let lastWindowBounds: Electron.Rectangle = { width: 1024, height: 768, x: undefined, y: undefined };
 let splashWindow: BrowserWindow | null = null;
+let settingsWindow: BrowserWindow | null = null;
 
 
 function getRepoNameFromUrl(url: string): string | null {
@@ -55,6 +59,49 @@ function updateSplashStatus(message: string) {
     splashWindow.webContents.send('status-update', message);
   }
 }
+
+function openSettingsWindow() {
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+    settingsWindow = new BrowserWindow({
+        width: 600,
+        height: 400,
+        title: 'Settings',
+        modal: true,
+        parent: mainWindow,
+        resizable: false,
+        frame: false,
+        show: false,
+        backgroundColor: '#2c2f33',
+        webPreferences: {
+            preload: SETTINGS_WINDOW_PRELOAD_WEBPACK_ENTRY, // Ensure this matches the name in forge.config.ts
+        },
+    });
+    settingsWindow.loadURL(SETTINGS_WINDOW_WEBPACK_ENTRY); // Ensure this matches the name in forge.config.ts
+    settingsWindow.once('ready-to-show', () => settingsWindow.show());
+    settingsWindow.on('closed', () => (settingsWindow = null));
+}
+
+ipcMain.on('open-settings-window', openSettingsWindow);
+ipcMain.on('close-settings-window', () => {
+    if (settingsWindow) settingsWindow.close();
+});
+ipcMain.handle('get-editor-paths', () => {
+    return {
+        photoshop: getSetting('photoshopPath'),
+        illustrator: getSetting('illustratorPath'),
+        gimp: getSetting('gimpPath'),
+    };
+});
+ipcMain.handle('select-editor-path', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        title: 'Select Editor Executable',
+    });
+    return !canceled && filePaths.length > 0 ? filePaths[0] : null;
+});
+ipcMain.handle('set-editor-path', (_, { editor, path }: { editor: string, path: string }) => {
+    setSetting(`${editor}Path`, path);
+});
 
 async function loadProjects(mainWindow: BrowserWindow, repositoryName: string) {
   if (!mainWindow || mainWindow.isDestroyed() || !repositoryName) {
@@ -216,6 +263,33 @@ ipcMain.on('select-cover-image', async (event) => {
 
 ipcMain.on('cancel-project-creation', () => {
   if (createProjectWindow) createProjectWindow.close();
+});
+
+ipcMain.handle('open-file-in-editor', async (_, { editor, filePath }: { editor: string, filePath: string }) => {
+    const editorPath = getSetting<string>(`${editor}Path`);
+
+    if (!editorPath) {
+        dialog.showMessageBox({
+            type: 'warning',
+            title: 'Editor Path Not Set',
+            message: `You haven't linked your programs. Please do so on the settings screen.`
+        });
+        return { success: false, error: 'Editor path not set.' };
+    }
+
+    try {
+        if (!await fs.pathExists(editorPath)) throw new Error(`Executable not found at: ${editorPath}`);
+        if (!await fs.pathExists(filePath)) throw new Error(`Image file not found at: ${filePath}`);
+
+        execFile(editorPath, [filePath], (error) => {
+            if (error) throw error;
+        });
+        return { success: true };
+    } catch (error) {
+        console.error(`Failed to open ${filePath} in ${editor}:`, error);
+        dialog.showErrorBox('Error Opening File', `Could not open file in ${editor}.\n\nError: ${error.message}`);
+        return { success: false, error: error.message };
+    }
 });
 
 ipcMain.handle('git-pull', async (_, repoName: string) => {
