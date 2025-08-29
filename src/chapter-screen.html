@@ -53,34 +53,48 @@
             text-align: center;
             margin: -5px 0 15px 0;
         }
+
+        .header-right { display: flex; align-items: center; gap: 10px; }
+        .action-btn { background-color: #43b581; color: white; padding: 8px 16px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .header-icon-btn { display: flex; align-items: center; justify-content: center; }
+        .chapter-workspace { display: flex; height: calc(100vh - 65px); }
+        .main-view { flex-grow: 1; padding: 24px; display: flex; justify-content: center; align-items: center; color: #99aab5; }
+        #pages-sidebar { width: 300px; background-color: #2c2f33; padding: 15px; border-left: 1px solid #4a4d52; overflow-y: auto; }
+        .sidebar-header { margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 1px solid #4a4d52; }
+        #page-list { display: flex; flex-direction: column; gap: 10px; }
+        .page-status-item { display: flex; align-items: center; justify-content: space-between; background-color: #23272a; padding: 8px 12px; border-radius: 4px; }
+        .page-status-item .page-name { font-weight: bold; }
+        .page-status-item .status-tags { display: flex; gap: 8px; font-size: 12px; }
+        .status-tag { padding: 2px 4px; border-radius: 3px; background-color: #4a4d52; }
+        .status-tag.checked { background-color: #43b581; color: white; }
+        .status-tag.circled { border: 1px solid #faa61a; background-color: transparent; color: #faa61a; }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="header-left">
             <a href="#" id="back-to-projects-btn" class="back-btn">&larr;</a>
+            <a href="#" id="open-folder-btn" class="header-icon-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="24px" height="24px"><path d="M10 4H4c-1.11 0-2 .89-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8c0-1.11-.9-2-2-2h-8l-2-2z"/></svg>
+            </a>
             <h1 id="project-name-header"></h1>
         </div>
-        <button id="create-chapter-btn">+ New Chapter</button>
-    </div>
-
-    <div class="git-container">
-        <div class="git-header">
-            <h2>Source Control</h2>
-            <div class="git-buttons">
-                <button id="git-status-btn">Refresh Status</button>
-                <button id="git-push-btn">Push to GitHub</button>
-            </div>
-        </div>
-        <p class="git-instructions">To upload chapters, first commit your changes, then press 'Push to GitHub'.</p>
-        <div id="git-changed-files">Click 'Refresh Status' to see file changes.</div>
-        <div class="commit-area">
-          <input type="text" id="git-commit-message" placeholder="Commit message (e.g., Updated Chapter 5)">
-            <button id="git-commit-btn">Commit Changes</button>
+        <div class="header-right">
+            <button id="translate-btn" class="action-btn">Translate</button>
+            <button id="create-chapter-btn">+ New Chapter</button>
         </div>
     </div>
 
-    <div id="chapter-grid">
+    <div class="chapter-workspace">
+        <div class="main-view">
+            <div id="gallery-view-container" style="display: none;"></div>
+            <p id="workspace-placeholder">Select an action like "Translate" or click a page to begin.</p>
+        </div>
+        <div id="pages-sidebar">
+            <h3 class="sidebar-header">Pages</h3>
+            <div id="page-list">
+                </div>
+        </div>
     </div>
 </body>
 </html>

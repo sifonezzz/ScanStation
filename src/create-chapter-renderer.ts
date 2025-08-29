@@ -38,7 +38,6 @@ window.addEventListener('DOMContentLoaded', () => {
     createBtn.addEventListener('click', async () => {
         const chapterNumber = numberInput.value;
         const chapterName = nameInput.value.trim();
-        const includeFinal = finalFolderCheckbox.checked;
 
         if (!currentRepoName || !currentProjectName) {
             alert('Error: No project context found.');
@@ -54,7 +53,6 @@ window.addEventListener('DOMContentLoaded', () => {
             projectName: currentProjectName,
             chapterNumber,
             chapterName,
-            includeFinal
         });
         // The main process will close the window on success
         if (!result.success) {

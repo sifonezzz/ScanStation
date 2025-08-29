@@ -4,6 +4,7 @@ import fs from 'fs-extra';
 import simpleGit, { SimpleGit } from 'simple-git';
 import sharp from 'sharp';
 import { getSetting, setSetting } from './settings';
+import { app, BrowserWindow, ipcMain, dialog, protocol, session, shell } from 'electron';
 
 // Declare the entry points for Webpack.
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
@@ -389,7 +390,7 @@ ipcMain.on('cancel-chapter-creation', () => {
 });
 
 ipcMain.handle('submit-chapter-creation', async (_, data) => {
-    const { repoName, projectName, chapterNumber, chapterName, includeFinal } = data;
+    const { repoName, projectName, chapterNumber, chapterName } = data;
     const chapterFolderName = `chapter ${chapterNumber} - ${chapterName.replace(/[^a-z0-9_ -]/gi, '')}`;
     const chapterPath = path.join(getStoragePath(), repoName, projectName, chapterFolderName);
     if (await fs.pathExists(chapterPath)) {
@@ -397,14 +398,16 @@ ipcMain.handle('submit-chapter-creation', async (_, data) => {
       return { success: false };
     }
     try {
-        const foldersToCreate = ['Raws', 'Raws Cleaned', 'Edit Files', 'Typesetted'];
-        if (includeFinal) foldersToCreate.push('Final');
+        // "Final" folder is now created by default
+        const foldersToCreate = ['Raws', 'Raws Cleaned', 'Edit Files', 'Typesetted', 'Final', 'data'];
+        
         await Promise.all(foldersToCreate.map(folder => fs.ensureDir(path.join(chapterPath, folder))));
         await refreshChapters(chapterScreenWindow, repoName, projectName);
         if (createChapterWindow) createChapterWindow.close();
         return { success: true };
     } catch (error) {
-        dialog.showErrorBox('Creation Failed', `Could not create chapter. Error: ${error.message}`);
+        dialog.showErrorBox('Creation Failed', `Could not create chapter.
+Error: ${error.message}`);
         return { success: false };
     }
 });
@@ -536,6 +539,114 @@ ipcMain.handle('git-sync-repository', async (_, repoName: string) => {
     }
 });
 
+// --- Chapter Workspace IPC Handlers ---
+
+// Helper function to read/write a JSON status file in the chapter's 'data' folder
+async function getChapterStatus(chapterPath: string) {
+    const statusFilePath = path.join(chapterPath, 'data', 'page_status.json');
+    if (!await fs.pathExists(statusFilePath)) return {};
+    const content = await fs.readFile(statusFilePath, 'utf-8');
+    return content ? JSON.parse(content) : {};
+}
+
+async function saveChapterStatus(chapterPath: string, status: any) {
+    const statusFilePath = path.join(chapterPath, 'data', 'page_status.json');
+    await fs.ensureFile(statusFilePath);
+    await fs.writeFile(statusFilePath, JSON.stringify(status, null, 2));
+}
+
+// Opens the chapter's folder in the system's file explorer
+ipcMain.on('open-chapter-folder', (_, chapterPath: string) => {
+    shell.openPath(chapterPath);
+});
+
+// Gathers the status of all pages in a chapter
+ipcMain.handle('get-chapter-page-status', async (_, chapterPath: string) => {
+    try {
+        const rawFiles = await fs.readdir(path.join(chapterPath, 'Raws'));
+        const cleanedFiles = new Set(await fs.readdir(path.join(chapterPath, 'Raws Cleaned')));
+        const typesetFiles = new Set(await fs.readdir(path.join(chapterPath, 'Typesetted')));
+        const statusData = await getChapterStatus(chapterPath);
+
+        const pages = rawFiles
+            .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
+            .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+            .map(pageFile => {
+                const pageStatus = statusData[pageFile] || {};
+                return {
+                    fileName: pageFile,
+                    status: {
+                        CL: cleanedFiles.has(pageFile),
+                        TS: typesetFiles.has(pageFile),
+                        TL: pageStatus.TL || false,
+                        PR: pageStatus.PR || false,
+                        QC: pageStatus.QC || false,
+                    }
+                };
+            });
+        return { success: true, pages };
+    } catch (error) {
+        dialog.showErrorBox('Error Loading Pages', `Could not read page folders. Error: ${error.message}`);
+        return { success: false, pages: [] };
+    }
+});
+
+// Generic handlers to read text or JSON file content
+ipcMain.handle('get-file-content', async (_, filePath: string) => {
+    return (await fs.pathExists(filePath)) ? fs.readFile(filePath, 'utf-8') : '';
+});
+
+ipcMain.handle('get-json-content', async (_, filePath: string) => {
+    if (!await fs.pathExists(filePath)) return null;
+    const content = await fs.readFile(filePath, 'utf-8');
+    return JSON.parse(content);
+});
+
+// Saves translation text and drawing data
+ipcMain.handle('save-translation-data', async (_, { chapterPath, pageFile, text, drawingData }) => {
+    const status = await getChapterStatus(chapterPath);
+    await fs.writeFile(path.join(chapterPath, 'data', `${pageFile}.txt`), text);
+    await fs.writeFile(path.join(chapterPath, 'data', `${pageFile}_drawing.json`), JSON.stringify(drawingData));
+    
+    if (!status[pageFile]) status[pageFile] = {};
+    status[pageFile].TL = true;
+    await saveChapterStatus(chapterPath, status);
+    return { success: true, newStatus: status[pageFile] };
+});
+
+// Saves proofread annotations
+ipcMain.handle('save-proofread-data', async (_, { chapterPath, pageFile, annotations }) => {
+    const status = await getChapterStatus(chapterPath);
+    await fs.writeFile(path.join(chapterPath, 'data', `${pageFile}_proof.txt`), annotations);
+
+    if (!status[pageFile]) status[pageFile] = {};
+    status[pageFile].PR = 'annotated';
+    status[pageFile].QC = 'annotated';
+    await saveChapterStatus(chapterPath, status);
+    return { success: true, newStatus: status[pageFile] };
+});
+
+// Marks a page as correct, copies it to the Final folder, and updates its status
+ipcMain.handle('mark-page-correct', async (_, { chapterPath, pageFile }) => {
+    const typesetPath = path.join(chapterPath, 'Typesetted', pageFile);
+    if (!await fs.pathExists(typesetPath)) {
+      return { success: false, error: 'Typeset file not found.' };
+    }
+    
+    await fs.copy(typesetPath, path.join(chapterPath, 'Final', pageFile), { overwrite: true });
+    
+    const status = await getChapterStatus(chapterPath);
+    if (!status[pageFile]) status[pageFile] = {};
+    status[pageFile].PR = true;
+    status[pageFile].QC = true;
+    await saveChapterStatus(chapterPath, status);
+
+    const annotationsPath = path.join(chapterPath, 'data', `${pageFile}_proof.txt`);
+    if(await fs.pathExists(annotationsPath)) await fs.remove(annotationsPath);
+
+    return { success: true, newStatus: status[pageFile] };
+});
+
 function getStoragePath(): string {
   const customPath = getSetting<string>('projectStoragePath');
   const basePath = customPath || path.join(app.getPath('userData'), 'Scanstation');
@@ -565,36 +676,60 @@ async function updateAllRepositories() {
     console.log('Checking for repository updates...');
     const repos = getSetting<string[]>('repositories') || [];
     const pat = getSetting<string>('githubPat');
+    const outdatedRepos: string[] = [];
 
     for (const repoName of repos) {
         const repoPath = path.join(getStoragePath(), repoName);
         try {
             if (await fs.pathExists(path.join(repoPath, '.git'))) {
-                console.log(`Pulling latest changes for ${repoName}...`);
+                console.log(`Checking for outdated status in ${repoName}...`);
                 const git = simpleGit(repoPath);
+
+                // Perform an authenticated fetch to get remote status
                 if (pat) {
                     const remotes = await git.getRemotes(true);
                     const origin = remotes.find(r => r.name === 'origin');
                     if (origin) {
                         const originalUrl = origin.refs.fetch;
-                        // CORRECTED LINE
                         const cleanUrl = originalUrl.replace(/^(https:\/\/)(?:.*@)?(.*)$/, '$1$2');
                         try {
                             const authenticatedUrl = cleanUrl.replace('https://', `https://${pat}@`);
                             await git.remote(['set-url', 'origin', authenticatedUrl]);
-                            await git.pull();
+                            await git.fetch();
                         } finally {
                             await git.remote(['set-url', 'origin', originalUrl]);
                         }
+                    } else {
+                         await git.fetch(); // Fallback for no origin
                     }
                 } else {
-                    await git.pull();
+                    await git.fetch();
+                }
+
+                // Check status and record if outdated
+                const status = await git.status();
+                if (status.behind > 0) {
+                    outdatedRepos.push(repoName);
                 }
             }
         } catch (error) {
-            console.error(`Failed to pull repository ${repoName}:`, error.message);
+            console.error(`Failed to check repository status for ${repoName}:`, error.message);
+            // Silently fail for one repo to not interrupt the startup for others.
         }
     }
+
+    // After checking all repos, show a single prompt if any are outdated.
+    if (outdatedRepos.length > 0) {
+        const isSingle = outdatedRepos.length === 1;
+        const repoList = outdatedRepos.join(', ');
+        dialog.showMessageBox({
+            type: 'warning',
+            title: `Repository${isSingle ? '' : 's'} Outdated`,
+            message: `Your repositor${isSingle ? 'y' : 'ies'} (${repoList}) ${isSingle ? 'is' : 'are'} outdated.`,
+            detail: 'Remember to pull before making any local changes to avoid potential conflicts.'
+        });
+    }
+
     console.log('Repository update check finished.');
 }
 

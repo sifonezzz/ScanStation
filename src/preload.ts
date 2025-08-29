@@ -7,6 +7,15 @@ contextBridge.exposeInMainWorld('api', {
   deleteProject: (repoName, projectName) => ipcRenderer.invoke('delete-project', { repoName, projectName }),
   openEditProjectWindow: (repoName, projectName) => ipcRenderer.send('open-edit-project-window', { repoName, projectName }),
 
+  // --- Chapter Workspace ---
+openChapterFolder: (chapterPath) => ipcRenderer.send('open-chapter-folder', chapterPath),
+getChapterPageStatus: (chapterPath) => ipcRenderer.invoke('get-chapter-page-status', chapterPath),
+getFileContent: (filePath) => ipcRenderer.invoke('get-file-content', filePath),
+getJsonContent: (filePath) => ipcRenderer.invoke('get-json-content', filePath),
+saveTranslationData: (data) => ipcRenderer.invoke('save-translation-data', data),
+saveProofreadData: (data) => ipcRenderer.invoke('save-proofread-data', data),
+markPageCorrect: (data) => ipcRenderer.invoke('mark-page-correct', data),
+
   // Add this with your other API definitions
   onStatusUpdate: (callback) => ipcRenderer.on('status-update', (_event, message) => callback(message)),
 
