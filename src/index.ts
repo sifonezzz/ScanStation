@@ -296,10 +296,18 @@ ipcMain.on('submit-project-creation', async (_, { repoName, name, path: coverPat
   }
 });
 
-ipcMain.on('open-project', (_, { repoName, projectName }) => {
+ipcMain.on('open-project', (_, { repoName, projectName, chapterName }) => {
     const mainWindow = BrowserWindow.getAllWindows()[0];
     if (mainWindow) {
-        mainWindow.webContents.send('show-chapter-screen', { repoName, projectName });
+        const chapterPath = path.join(getStoragePath(), repoName, projectName, chapterName);
+        
+        // 1. Load the correct chapter screen HTML file
+        mainWindow.loadURL(CHAPTER_SCREEN_WINDOW_WEBPACK_ENTRY);
+
+        // 2. After the page is loaded, send the data it needs
+        mainWindow.webContents.once('dom-ready', () => {
+            mainWindow.webContents.send('project-data-for-chapter-screen', { repoName, projectName, chapterName, chapterPath });
+        });
     }
 });
 
@@ -358,10 +366,14 @@ ipcMain.handle('submit-project-update', async (_, data) => {
   }
 });
 
-ipcMain.on('go-back-to-projects', () => {
+ipcMain.on('go-back-to-projects', (_, { repoName, projectName }) => {
     const mainWindow = BrowserWindow.getAllWindows()[0];
     if (mainWindow) {
-        mainWindow.webContents.send('show-project-screen');
+        mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+        // After the main window loads, tell it to show the chapter selection screen
+        mainWindow.webContents.once('dom-ready', () => {
+            mainWindow.webContents.send('show-chapter-selection-for-project', { repoName, projectName });
+        });
     }
 });
 
@@ -370,19 +382,31 @@ ipcMain.on('get-chapters', async (event, { repoName, projectName }) => {
 });
 
 ipcMain.on('open-create-chapter-window', (_, { repoName, projectName }) => {
-    if (!chapterScreenWindow) return;
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+    if (!mainWindow) return; // Exit if the main window isn't found
+
     createChapterWindow = new BrowserWindow({
-      width: 450, height: 480, title: 'Create New Chapter', modal: true,
-      parent: chapterScreenWindow, resizable: false, frame: false, show: false,
+      width: 450,
+      height: 380, // Adjusted height after removing the optional folder checkbox
+      title: 'Create New Chapter',
+      modal: true,
+      parent: mainWindow, // Use the main window as the parent
+      resizable: false,
+      frame: false,
+      show: false,
       backgroundColor: '#2c2f33',
-      webPreferences: { preload: CREATE_CHAPTER_WINDOW_PRELOAD_WEBPACK_ENTRY, },
+      webPreferences: {
+        preload: CREATE_CHAPTER_WINDOW_PRELOAD_WEBPACK_ENTRY,
+      },
     });
+    
     createChapterWindow.once('ready-to-show', () => createChapterWindow.show());
+    
     createChapterWindow.webContents.once('dom-ready', () => {
-      // This line needs to send an object with both repoName and projectName
       createChapterWindow.webContents.send('project-data-for-create-chapter', { repoName, projectName });
     });
-     createChapterWindow.loadURL(CREATE_CHAPTER_WINDOW_WEBPACK_ENTRY);
+
+    createChapterWindow.loadURL(CREATE_CHAPTER_WINDOW_WEBPACK_ENTRY);
 });
 
 ipcMain.on('cancel-chapter-creation', () => {

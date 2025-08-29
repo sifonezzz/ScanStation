@@ -6,6 +6,11 @@ rules.push({
   use: [{ loader: 'style-loader' }, { loader: 'css-loader' }],
 });
 
+rules.push({
+  test: /\.html$/,
+  use: 'html-loader',
+});
+
 const rendererConfig = {
   module: {
     rules,

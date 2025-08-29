@@ -3,25 +3,23 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('api', {
   // --- Main Window ---
   onProjectsLoaded: (callback) => ipcRenderer.on('projects-loaded', (_event, projects) => callback(projects)),
-  openProject: (repoName, projectName) => ipcRenderer.send('open-project', { repoName, projectName }),
+  openProject: (repoName, projectName, chapterName) => ipcRenderer.send('open-project', { repoName, projectName, chapterName }),
   deleteProject: (repoName, projectName) => ipcRenderer.invoke('delete-project', { repoName, projectName }),
   openEditProjectWindow: (repoName, projectName) => ipcRenderer.send('open-edit-project-window', { repoName, projectName }),
 
   // --- Chapter Workspace ---
-openChapterFolder: (chapterPath) => ipcRenderer.send('open-chapter-folder', chapterPath),
-getChapterPageStatus: (chapterPath) => ipcRenderer.invoke('get-chapter-page-status', chapterPath),
-getFileContent: (filePath) => ipcRenderer.invoke('get-file-content', filePath),
-getJsonContent: (filePath) => ipcRenderer.invoke('get-json-content', filePath),
-saveTranslationData: (data) => ipcRenderer.invoke('save-translation-data', data),
-saveProofreadData: (data) => ipcRenderer.invoke('save-proofread-data', data),
-markPageCorrect: (data) => ipcRenderer.invoke('mark-page-correct', data),
+  openChapterFolder: (chapterPath) => ipcRenderer.send('open-chapter-folder', chapterPath),
+  getChapterPageStatus: (chapterPath) => ipcRenderer.invoke('get-chapter-page-status', chapterPath),
+  getFileContent: (filePath) => ipcRenderer.invoke('get-file-content', filePath),
+  getJsonContent: (filePath) => ipcRenderer.invoke('get-json-content', filePath),
+  saveTranslationData: (data) => ipcRenderer.invoke('save-translation-data', data),
+  saveProofreadData: (data) => ipcRenderer.invoke('save-proofread-data', data),
+  markPageCorrect: (data) => ipcRenderer.invoke('mark-page-correct', data),
 
   // Add this with your other API definitions
   onStatusUpdate: (callback) => ipcRenderer.on('status-update', (_event, message) => callback(message)),
 
   // ... inside the api object
-  onShowChapterScreen: (callback) => ipcRenderer.on('show-chapter-screen', (_event, data) => callback(data)),
-  onShowProjectScreen: (callback) => ipcRenderer.on('show-project-screen', (_event) => callback()),
 
   // --- Create Project Window ---
   createProject: (repoName) => ipcRenderer.send('open-create-project-window', repoName),
@@ -37,9 +35,15 @@ markPageCorrect: (data) => ipcRenderer.invoke('mark-page-correct', data),
   // --- Chapter Screen ---
   onProjectDataForChapterScreen: (callback) => ipcRenderer.on('project-data-for-chapter-screen', (_event, data) => callback(data)),
   getChapters: (repoName, projectName) => ipcRenderer.send('get-chapters', { repoName, projectName }),
-  onChaptersLoaded: (callback) => ipcRenderer.on('chapters-loaded', (_event, chapters) => callback(chapters)),
+  onChaptersLoaded: (callback) => {
+  const listener = (_event: unknown, chapters: { name: string }[]) => callback(chapters);
+  ipcRenderer.on('chapters-loaded', listener);
+  // Return a function that can be called to remove this specific listener
+  return () => ipcRenderer.removeListener('chapters-loaded', listener);
+},
+  onShowChapterSelection: (callback) => ipcRenderer.on('show-chapter-selection-for-project', (_event, data) => callback(data)),
   openCreateChapterWindow: (repoName, projectName) => ipcRenderer.send('open-create-chapter-window', { repoName, projectName }),
-  goBackToProjects: () => ipcRenderer.send('go-back-to-projects'),
+  goBackToProjects: (repoName, projectName) => ipcRenderer.send('go-back-to-projects', { repoName, projectName }),
 
   // --- Create Chapter Window ---
   onProjectDataForCreateChapter: (callback) => ipcRenderer.on('project-data-for-create-chapter', (_event, data) => callback(data)),

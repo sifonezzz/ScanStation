@@ -41,6 +41,7 @@ let currentRepoName: string | null = null;
 let currentProjectName: string | null = null;
 // --- State for Project Screen ---
 let isEditMode = false;
+let projectGrid: HTMLElement;
 let currentRepositories: string[] = [];
 let selectedRepository: string | null = null;
 let hasPat = false;
@@ -53,7 +54,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // --- Elements for Project Screen ---
   const createProjectBtn = document.getElementById('create-project-btn');
   const editBtn = document.getElementById('edit-btn');
-  const projectGrid = document.getElementById('project-grid');
+  projectGrid = document.getElementById('project-grid');
   const repoDropdown = document.getElementById('repo-dropdown') as HTMLSelectElement;
   const addRepoBtn = document.getElementById('add-repo-btn');
   const pushRepoBtn = document.getElementById('push-repo-btn');
@@ -80,28 +81,16 @@ window.addEventListener('DOMContentLoaded', () => {
   const commitBtn = document.getElementById('git-commit-btn');
 
   // --- Screen Navigation Logic ---
-  window.api.onShowChapterScreen((data) => {
-      currentRepoName = data.repoName;
-      currentProjectName = data.projectName;
-      projectNameHeader.textContent = data.projectName;
-      window.api.getChapters(data.repoName, data.projectName);
 
-      projectScreen.style.display = 'none';
-      chapterScreen.style.display = 'block';
-  });
-
-  window.api.onShowProjectScreen(() => {
-      chapterScreen.style.display = 'none';
-      projectScreen.style.display = 'block';
-      if (selectedRepository) {
-          window.api.loadProjects(selectedRepository);
-      }
-  });
 
   // --- CHAPTER SCREEN LOGIC ---
   const showGitStatus = (text: string) => {
     changedFilesDiv.textContent = text;
   };
+
+  window.api.onShowChapterSelection((data) => {
+    showChapterSelection(data.repoName, data.projectName);
+  });
 
   window.api.onChaptersLoaded((chapters) => {
     chapterGrid.innerHTML = '';
@@ -369,7 +358,7 @@ window.addEventListener('DOMContentLoaded', () => {
       
       const overlay = document.createElement('div');
       overlay.className = 'project-card-overlay';
-
+      
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'project-action-btn delete-btn';
       deleteBtn.textContent = '-';
@@ -391,16 +380,103 @@ window.addEventListener('DOMContentLoaded', () => {
       card.appendChild(title);
       card.appendChild(overlay);
 
+      // MODIFIED CLICK EVENT
       card.addEventListener('click', () => {
         if (!isEditMode) {
-          window.api.openProject(selectedRepository, project.name);
+          // Instead of opening the project directly, show the chapter list
+          showChapterSelection(selectedRepository, project.name);
         }
       });
       projectGrid.appendChild(card);
     }
-  });
+});
 
   initialize();
 });
 
+function showChapterSelection(repoName: string, projectName: string) {
+  // 1. Get a reference to the main project screen and hide it.
+  const projectScreen = document.getElementById('project-screen');
+  if (projectScreen) {
+    projectScreen.style.display = 'none';
+  }
+
+  // 2. Create a new, dedicated container for chapter selection.
+  const chapterSelectionContainer = document.createElement('div');
+  chapterSelectionContainer.id = 'chapter-selection-screen';
+
+  // 3. Create the new, correct header for this screen.
+  const header = document.createElement('div');
+  header.className = 'header';
+
+  // --- Header Left Side (Back button and Title) ---
+  const headerLeft = document.createElement('div');
+  headerLeft.className = 'header-left';
+  
+  const backBtn = document.createElement('a');
+  backBtn.href = '#';
+  backBtn.className = 'back-btn';
+  backBtn.innerHTML = '&larr;';
+  backBtn.style.fontSize = '24px';
+  backBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    chapterSelectionContainer.remove();
+    if (projectScreen) {
+      projectScreen.style.display = 'block';
+    }
+  });
+
+  const title = document.createElement('h1');
+  title.textContent = projectName;
+  headerLeft.appendChild(backBtn);
+  headerLeft.appendChild(title);
+
+  // --- Header Right Side (+ New Chapter Button) ---
+  const headerRight = document.createElement('div');
+  headerRight.className = 'header-buttons'; // Re-use existing class for styling
+
+  const createChapterBtn = document.createElement('button');
+  createChapterBtn.id = 'create-chapter-btn';
+  createChapterBtn.textContent = '+ New Chapter';
+  createChapterBtn.addEventListener('click', () => {
+    // This calls the API to open the "Create New Chapter" modal window
+    window.api.openCreateChapterWindow(repoName, projectName);
+  });
+  headerRight.appendChild(createChapterBtn);
+  
+  // Add both sides to the header
+  header.appendChild(headerLeft);
+  header.appendChild(headerRight);
+
+  // 4. Create the grid for the chapters.
+  const chapterGrid = document.createElement('div');
+  chapterGrid.className = 'chapter-grid';
+  chapterGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">Loading chapters...</p>`;
+
+  // 5. Assemble the new screen and add it to the page.
+  chapterSelectionContainer.appendChild(header);
+  chapterSelectionContainer.appendChild(chapterGrid);
+  document.body.appendChild(chapterSelectionContainer);
+
+  // 6. Listen for chapters and render them.
+  const removeListener = window.api.onChaptersLoaded((chapters) => {
+    chapterGrid.innerHTML = '';
+    if (chapters.length === 0) {
+      chapterGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">No chapters found for this project.</p>`;
+    } else {
+      for (const chapter of chapters) {
+        const card = document.createElement('div');
+        card.className = 'chapter-card';
+        card.textContent = chapter.name.replace(/_/g, ' ');
+        card.addEventListener('click', () => {
+          window.api.openProject(repoName, projectName, chapter.name);
+        });
+        chapterGrid.appendChild(card);
+      }
+    }
+    removeListener();
+  });
+
+  window.api.getChapters(repoName, projectName);
+}
 export {};
