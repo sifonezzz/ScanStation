@@ -8,7 +8,14 @@ rules.push({
 
 rules.push({
   test: /\.html$/,
-  use: 'html-loader',
+  use: {
+    loader: 'html-loader',
+    options: {
+      // This tells html-loader not to try and resolve image src attributes.
+      // We handle all image paths dynamically in our JavaScript.
+      sources: false,
+    },
+  },
 });
 
 const rendererConfig = {

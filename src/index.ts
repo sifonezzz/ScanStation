@@ -1,10 +1,9 @@
-import { app, BrowserWindow, ipcMain, dialog, protocol, session } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, protocol, session, shell } from 'electron';
 import path from 'path';
 import fs from 'fs-extra';
 import simpleGit, { SimpleGit } from 'simple-git';
 import sharp from 'sharp';
 import { getSetting, setSetting } from './settings';
-import { app, BrowserWindow, ipcMain, dialog, protocol, session, shell } from 'electron';
 
 // Declare the entry points for Webpack.
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
@@ -627,48 +626,95 @@ ipcMain.handle('get-json-content', async (_, filePath: string) => {
 });
 
 // Saves translation text and drawing data
+
+// --- REPLACE WITH THIS UPDATED VERSION ---
 ipcMain.handle('save-translation-data', async (_, { chapterPath, pageFile, text, drawingData }) => {
-    const status = await getChapterStatus(chapterPath);
-    await fs.writeFile(path.join(chapterPath, 'data', `${pageFile}.txt`), text);
-    await fs.writeFile(path.join(chapterPath, 'data', `${pageFile}_drawing.json`), JSON.stringify(drawingData));
-    
-    if (!status[pageFile]) status[pageFile] = {};
-    status[pageFile].TL = true;
-    await saveChapterStatus(chapterPath, status);
-    return { success: true, newStatus: status[pageFile] };
+    try {
+        const tlDataPath = path.join(chapterPath, 'data', 'TL Data');
+        await fs.ensureDir(tlDataPath);
+
+        const status = await getChapterStatus(chapterPath);
+        // Always save the text and drawing files
+        await fs.writeFile(path.join(tlDataPath, `${pageFile}.txt`), text);
+        await fs.writeFile(path.join(tlDataPath, `${pageFile}_drawing.json`), JSON.stringify(drawingData));
+        
+        if (!status[pageFile]) status[pageFile] = {};
+
+        // Only mark as translated if there is actual text content.
+        if (text && text.trim().length > 0) {
+            status[pageFile].TL = true;
+        } else {
+            status[pageFile].TL = false;
+        }
+
+        await saveChapterStatus(chapterPath, status);
+        return { success: true, newStatus: status[pageFile] };
+    } catch (error) {
+        console.error('Error saving translation data:', error);
+        return { success: false, error: error.message };
+    }
 });
 
 // Saves proofread annotations
 ipcMain.handle('save-proofread-data', async (_, { chapterPath, pageFile, annotations }) => {
-    const status = await getChapterStatus(chapterPath);
-    await fs.writeFile(path.join(chapterPath, 'data', `${pageFile}_proof.txt`), annotations);
+    try {
+        const prDataPath = path.join(chapterPath, 'data', 'PR Data');
+        await fs.ensureDir(prDataPath);
 
-    if (!status[pageFile]) status[pageFile] = {};
-    status[pageFile].PR = 'annotated';
-    status[pageFile].QC = 'annotated';
-    await saveChapterStatus(chapterPath, status);
-    return { success: true, newStatus: status[pageFile] };
+        const status = await getChapterStatus(chapterPath);
+        // Always save the annotation file to capture when a user clears their notes
+        await fs.writeFile(path.join(prDataPath, `${pageFile}_proof.txt`), annotations);
+
+        if (!status[pageFile]) status[pageFile] = {};
+
+        // Only circle the status if there are actual annotations.
+        if (annotations && annotations.trim().length > 0) {
+            status[pageFile].PR = 'annotated';
+            status[pageFile].QC = 'annotated';
+        } else {
+            // If annotations are cleared, revert the status from 'annotated' to false (not started).
+            // This won't affect pages that are already marked as correct (true).
+            if (status[pageFile].PR === 'annotated') {
+                status[pageFile].PR = false;
+            }
+            if (status[pageFile].QC === 'annotated') {
+                status[pageFile].QC = false;
+            }
+        }
+
+        await saveChapterStatus(chapterPath, status);
+        return { success: true, newStatus: status[pageFile] };
+    } catch (error) {
+        console.error('Error saving proofread data:', error);
+        return { success: false, error: error.message };
+    }
 });
 
 // Marks a page as correct, copies it to the Final folder, and updates its status
 ipcMain.handle('mark-page-correct', async (_, { chapterPath, pageFile }) => {
-    const typesetPath = path.join(chapterPath, 'Typesetted', pageFile);
-    if (!await fs.pathExists(typesetPath)) {
-      return { success: false, error: 'Typeset file not found.' };
+    try {
+        const typesetPath = path.join(chapterPath, 'Typesetted', pageFile);
+        if (!await fs.pathExists(typesetPath)) {
+          return { success: false, error: 'Typeset file not found.' };
+        }
+        
+        await fs.copy(typesetPath, path.join(chapterPath, 'Final', pageFile), { overwrite: true });
+        
+        const status = await getChapterStatus(chapterPath);
+        if (!status[pageFile]) status[pageFile] = {};
+        status[pageFile].PR = true;
+        status[pageFile].QC = true;
+        await saveChapterStatus(chapterPath, status);
+
+        // Update path to look in PR Data folder
+        const annotationsPath = path.join(chapterPath, 'data', 'PR Data', `${pageFile}_proof.txt`);
+        if(await fs.pathExists(annotationsPath)) await fs.remove(annotationsPath);
+
+        return { success: true, newStatus: status[pageFile] };
+    } catch (error) {
+        console.error('Error marking page as correct:', error);
+        return { success: false, error: error.message };
     }
-    
-    await fs.copy(typesetPath, path.join(chapterPath, 'Final', pageFile), { overwrite: true });
-    
-    const status = await getChapterStatus(chapterPath);
-    if (!status[pageFile]) status[pageFile] = {};
-    status[pageFile].PR = true;
-    status[pageFile].QC = true;
-    await saveChapterStatus(chapterPath, status);
-
-    const annotationsPath = path.join(chapterPath, 'data', `${pageFile}_proof.txt`);
-    if(await fs.pathExists(annotationsPath)) await fs.remove(annotationsPath);
-
-    return { success: true, newStatus: status[pageFile] };
 });
 
 function getStoragePath(): string {
