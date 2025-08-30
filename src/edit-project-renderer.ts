@@ -1,66 +1,78 @@
+// REPLACE THE ENTIRE CONTENT of src/edit-project-renderer.ts WITH THIS:
+
 declare global {
   interface Window {
     api: {
-      onProjectDataForCreateChapter: (callback: (data: { repoName: string, projectName: string }) => void) => void;
-      submitChapterCreation: (data: {
+      onProjectDataForEdit: (callback: (data: { name: string; coverPath: string; repoName: string }) => void) => void;
+      selectCoverImage: () => void;
+      onCoverImageSelected: (callback: (path: string) => void) => void;
+      submitProjectUpdate: (data: {
         repoName: string;
-        projectName: string;
-        chapterNumber: string;
-        chapterName: string;
-        includeFinal: boolean;
+        originalName: string;
+        newName: string;
+        newCoverPath: string | null;
       }) => Promise<{ success: boolean }>;
-      cancelChapterCreation: () => void;
+      cancelProjectUpdate: () => void;
     };
   }
 }
 
 let currentRepoName: string | null = null;
-let currentProjectName: string | null = null;
+let originalProjectName: string | null = null;
+let newCoverPath: string | null = null;
 
 window.addEventListener('DOMContentLoaded', () => {
-    const numberInput = document.getElementById('chapter-number') as HTMLInputElement;
-    const nameInput = document.getElementById('chapter-name') as HTMLInputElement;
-    const finalFolderCheckbox = document.getElementById('include-final-folder') as HTMLInputElement;
-    const cancelBtn = document.getElementById('cancel-btn');
-    const createBtn = document.getElementById('create-btn');
+  const nameInput = document.getElementById('project-name') as HTMLInputElement;
+  const imageSelect = document.getElementById('cover-image-select');
+  const cancelBtn = document.getElementById('cancel-btn');
+  const saveBtn = document.getElementById('save-btn');
 
-    // 1. Receive both repoName and projectName from the main process
-    window.api.onProjectDataForCreateChapter((data) => {
-        currentRepoName = data.repoName;
-        currentProjectName = data.projectName;
-    });
+  // 1. Receive existing project data from main process
+  window.api.onProjectDataForEdit((data) => {
+    currentRepoName = data.repoName;
+    originalProjectName = data.name;
 
-    // 2. Handle button clicks
-    cancelBtn.addEventListener('click', () => {
-        window.api.cancelChapterCreation();
-    });
+    nameInput.value = data.name;
 
-    createBtn.addEventListener('click', async () => {
-        const chapterNumber = numberInput.value;
-        const chapterName = nameInput.value.trim();
-        const includeFinal = finalFolderCheckbox.checked;
+    const formattedPath = data.coverPath.replace(/\\/g, '/');
+    const imageUrl = `scanstation-asset:///${formattedPath}`;
+    imageSelect.style.backgroundImage = `url('${imageUrl}')`;
+    imageSelect.textContent = ''; // Clear placeholder text
+  });
 
-        if (!currentRepoName || !currentProjectName) {
-            alert('Error: No project context found.');
-            return;
-        }
-        if (!chapterNumber || !chapterName) {
-            alert('Chapter number and name are required.');
-            return;
-        }
+  // 2. Handle new cover image selection
+  imageSelect.addEventListener('click', () => {
+    window.api.selectCoverImage();
+  });
 
-        const result = await window.api.submitChapterCreation({
-            repoName: currentRepoName, // Include repoName in the submission
-            projectName: currentProjectName,
-            chapterNumber,
-            chapterName,
-            includeFinal
-        });
-        // The main process will close the window on success
-        if (!result.success) {
-            // Error was already shown by the main process
-        }
-    });
+  window.api.onCoverImageSelected((path) => {
+    newCoverPath = path; // Store the path to the new image
+    const formattedPath = path.replace(/\\/g, '/');
+    const imageUrl = `scanstation-asset:///${formattedPath}`;
+    imageSelect.style.backgroundImage = `url('${imageUrl}')`;
+  });
+
+  // 3. Handle button clicks
+  cancelBtn.addEventListener('click', () => {
+    window.api.cancelProjectUpdate();
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const newName = nameInput.value.trim();
+    if (!newName) {
+      alert('Project name cannot be empty.');
+      return;
+    }
+
+    if (currentRepoName && originalProjectName) {
+      await window.api.submitProjectUpdate({
+        repoName: currentRepoName,
+        originalName: originalProjectName,
+        newName: newName,
+        newCoverPath: newCoverPath, // Can be null if not changed
+      });
+    }
+  });
 });
 
 export {};

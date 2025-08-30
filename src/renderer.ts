@@ -56,6 +56,11 @@ window.addEventListener('DOMContentLoaded', () => {
   const editBtn = document.getElementById('edit-btn');
   projectGrid = document.getElementById('project-grid');
   const repoDropdown = document.getElementById('repo-dropdown') as HTMLSelectElement;
+  editBtn.addEventListener('click', () => {
+    isEditMode = !isEditMode; // Toggle the edit mode state
+    projectGrid.classList.toggle('edit-mode', isEditMode);
+    editBtn.textContent = isEditMode ? 'Done' : 'Edit';
+  });
   
   const pushRepoBtn = document.getElementById('push-repo-btn');
   const pullRepoBtn = document.getElementById('pull-repo-btn');

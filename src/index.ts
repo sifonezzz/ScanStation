@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs-extra';
 import simpleGit, { SimpleGit } from 'simple-git';
 import sharp from 'sharp';
-import { getSetting, setSetting } from './settings';
+import { getSetting, setSetting, deleteSetting } from './settings';
 import { execFile } from 'child_process';
 
 // Declare the entry points for Webpack.
@@ -296,6 +296,12 @@ ipcMain.handle('git-pull', async (_, repoName: string) => {
     const repoPath = path.join(getStoragePath(), repoName);
     const git = simpleGit(repoPath);
     const pat = getSetting<string>('githubPat');
+    if (!await fs.pathExists(path.join(repoPath, '.git'))) {
+        throw new Error(
+            `The folder for '${repoName}' is not a valid Git repository.\n\n` +
+            `Please remove the existing folder from your projects directory and add the repository again.`
+        );
+    }
 
     try {
         const pullAction = async (gitInstance: SimpleGit) => {
@@ -499,7 +505,10 @@ ipcMain.handle('submit-chapter-creation', async (_, data) => {
         const foldersToCreate = ['Raws', 'Raws Cleaned', 'Edit Files', 'Typesetted', 'Final', 'data'];
         
         await Promise.all(foldersToCreate.map(folder => fs.ensureDir(path.join(chapterPath, folder))));
-        await refreshChapters(chapterScreenWindow, repoName, projectName);
+        const parentWindow = createChapterWindow?.getParentWindow();
+        if (parentWindow) {
+            await refreshChapters(parentWindow, repoName, projectName);
+        }
         if (createChapterWindow) createChapterWindow.close();
         return { success: true };
     } catch (error) {
@@ -540,16 +549,24 @@ ipcMain.handle('add-repository', async (_, repoUrl: string) => {
     const pat = getSetting<string>('githubPat');
     const authenticatedUrl = pat ? repoUrl.replace('https://', `https://${pat}@`) : repoUrl;
 
-    if (await fs.pathExists(targetPath)) {
-        dialog.showMessageBox({ title: 'Repository Exists', message: `The folder for '${repoName}' already exists.` });
-    } else {
-        try {
-            await simpleGit().clone(authenticatedUrl, targetPath);
-        } catch (error) {
-            dialog.showErrorBox('Clone Failed', `Could not clone repository. This is often due to an invalid URL or an incorrect/missing Personal Access Token.\n\nError: ${error.message}`);
-            return { success: false };
-        }
-    }
+      if (await fs.pathExists(targetPath)) {
+          // Folder exists, now check if it's a valid git repo
+          if (await fs.pathExists(path.join(targetPath, '.git'))) {
+              dialog.showMessageBox({ title: 'Repository Exists', message: `The repository '${repoName}' has already been added.` });
+          } else {
+              // Folder exists but is NOT a git repo
+              dialog.showErrorBox('Invalid Folder', `A folder named '${repoName}' already exists but is not a valid Git repository.\n\nPlease manually remove this folder and try again.`);
+              return { success: false };
+          }
+      } else {
+          // Folder does not exist, so clone it
+          try {
+              await simpleGit().clone(authenticatedUrl, targetPath);
+          } catch (error) {
+              dialog.showErrorBox('Clone Failed', `Could not clone repository. This is often due to an invalid URL or an incorrect/missing Personal Access Token.\n\nError: ${error.message}`);
+              return { success: false };
+          }
+      }
     const currentRepos = getSetting<string[]>('repositories') || [];
     if (!currentRepos.includes(repoName)) {
         setSetting('repositories', [...currentRepos, repoName]);
@@ -565,6 +582,26 @@ ipcMain.handle('git-status', async (_, { repoName }) => {
     return {
         files: status.files,
     };
+});
+
+ipcMain.handle('heal-chapter-folders', async (_, chapterPath: string) => {
+    try {
+        const requiredFolders = [
+            'Raws', 'Raws Cleaned', 'Edit Files', 'Typesetted', 'Final', 'data',
+            path.join('data', 'TL Data'),
+            path.join('data', 'PR Data')
+        ];
+        
+        await Promise.all(
+            requiredFolders.map(folder => fs.ensureDir(path.join(chapterPath, folder)))
+        );
+        
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to heal chapter folders:', error);
+        dialog.showErrorBox('Healing Failed', `Could not recreate folder structure. Error: ${error.message}`);
+        return { success: false, error: error.message };
+    }
 });
 
 ipcMain.handle('git-commit', async (_, { repoName, message }) => {
@@ -662,8 +699,29 @@ ipcMain.handle('get-chapter-page-status', async (_, chapterPath: string) => {
     try {
         const rawFiles = await fs.readdir(path.join(chapterPath, 'Raws'));
         const cleanedFiles = new Set(await fs.readdir(path.join(chapterPath, 'Raws Cleaned')));
-        const typesetFiles = new Set(await fs.readdir(path.join(chapterPath, 'Typesetted')));
+        const initialTypesetFiles = await fs.readdir(path.join(chapterPath, 'Typesetted'));
         const statusData = await getChapterStatus(chapterPath);
+
+        const typesetFiles = new Set<string>();
+        for (const file of initialTypesetFiles) {
+            const spreadMatch = file.match(/^(\d+)-(\d+)\..+$/);
+            if (spreadMatch) {
+                const start = parseInt(spreadMatch[1], 10);
+                const end = parseInt(spreadMatch[2], 10);
+                for (let i = start; i <= end; i++) {
+                    const pageNumberStr = i.toString();
+                    // Find the corresponding raw file to add to the set
+                    const correspondingRaw = rawFiles.find(raw => 
+                        raw.replace(/[^0-9]/g, '').includes(pageNumberStr)
+                    );
+                    if (correspondingRaw) {
+                        typesetFiles.add(correspondingRaw);
+                    }
+                }
+            } else {
+                typesetFiles.add(file);
+            }
+        }
 
         const pages = rawFiles
             .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
@@ -680,7 +738,7 @@ ipcMain.handle('get-chapter-page-status', async (_, chapterPath: string) => {
                         QC: pageStatus.QC || false,
                     }
                 };
-            });
+        });
         return { success: true, pages };
     } catch (error) {
         dialog.showErrorBox('Error Loading Pages', `Could not read page folders. Error: ${error.message}`);
@@ -928,8 +986,8 @@ app.whenReady().then(async () => {
   updateSplashStatus('Backing up current user folder...');
   await backupProjects();
 
-  updateSplashStatus('Pulling changes from repositories...');
-  await updateAllRepositories();
+  // updateSplashStatus('Pulling changes from repositories...');
+  // await updateAllRepositories();
 
   updateSplashStatus('Done!');
   const mainWindow = createWindow();

@@ -10,16 +10,18 @@ type DrawingData = { lines: { color: string; points: { x: number; y: number }[] 
 // --- Module State ---
 let currentRepoName: string | null = null, currentProjectName: string | null = null, currentChapterPath: string | null = null;
 let pages: Page[] = [];
-let activeView: { name: string; saveData: () => Promise<void> } = { name: 'none', saveData: async () => {} };
-
-// --- DOM Elements ---
-let projectNameHeader: HTMLElement, backBtn: HTMLElement, openFolderBtn: HTMLElement, homeBtn: HTMLElement, translateBtn: HTMLElement, proofreadBtn: HTMLElement, typesetBtn: HTMLElement, galleryViewContainer: HTMLElement, workspacePlaceholder: HTMLElement, pageListDiv: HTMLElement;
-
+let activeView: {
+  name: string;
+  saveData: () => Promise<void>;
+  onKeydown?: (e: KeyboardEvent) => void;
+} = { name: 'none', saveData: async () => {} };
+let projectNameHeader: HTMLElement, backBtn: HTMLElement, openFolderBtn: HTMLElement, healFoldersBtn: HTMLElement, homeBtn: HTMLElement, translateBtn: HTMLElement, proofreadBtn: HTMLElement, typesetBtn: HTMLElement, galleryViewContainer: HTMLElement, workspacePlaceholder: HTMLElement, pageListDiv: HTMLElement;
 // --- Main Setup ---
 window.addEventListener('DOMContentLoaded', () => {
   projectNameHeader = document.getElementById('project-name-header');
   backBtn = document.getElementById('back-to-projects-btn');
   openFolderBtn = document.getElementById('open-folder-btn');
+  healFoldersBtn = document.getElementById('heal-folders-btn');
   homeBtn = document.getElementById('home-btn');
   translateBtn = document.getElementById('translate-btn');
   proofreadBtn = document.getElementById('proofread-btn');
@@ -36,6 +38,17 @@ window.addEventListener('DOMContentLoaded', () => {
     await loadAndRenderPageStatus();
     showHomeView(); // Show dashboard on load
   });
+
+  healFoldersBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (currentChapterPath) {
+          const result = await window.api.healChapterFolders(currentChapterPath);
+          if (result.success) {
+              alert('Base folders have been checked and recreated if missing. Refreshing page list.');
+              await loadAndRenderPageStatus(); // Reload the sidebar
+          }
+      }
+    });
 
   backBtn.addEventListener('click', (e) => { e.preventDefault(); window.api.goBackToProjects(currentRepoName, currentProjectName); });
   openFolderBtn.addEventListener('click', (e) => { e.preventDefault(); if (currentChapterPath) window.api.openChapterFolder(currentChapterPath); });
@@ -57,6 +70,11 @@ window.addEventListener('DOMContentLoaded', () => {
   typesetBtn.addEventListener('click', async () => {
     await activeView.saveData();
     showTypesetView(0);
+  });
+  window.addEventListener('keydown', (e) => {
+    if (activeView.onKeydown) {
+      activeView.onKeydown(e);
+    }
   });
 });
 
@@ -140,6 +158,7 @@ function showTypesetView(startingIndex: number) {
 function initTranslateView(startingIndex: number) {
   let currentPageIndex = startingIndex;
   const pageIndicator = document.getElementById('translate-page-indicator') as HTMLSpanElement;
+  const saveBtn = document.getElementById('translate-save-btn') as HTMLButtonElement;
   const rawImage = document.getElementById('translate-raw-image') as HTMLImageElement;
   const translationText = document.getElementById('translation-text') as HTMLTextAreaElement;
   const nextBtn = document.getElementById('translate-next-btn') as HTMLButtonElement;
@@ -151,6 +170,14 @@ function initTranslateView(startingIndex: number) {
   let drawingData: DrawingData = { lines: [] };
   let currentLine: { x: number, y: number }[] = [];
 
+
+  saveBtn.addEventListener('click', async () => {
+    const originalText = saveBtn.textContent;
+    saveBtn.textContent = 'Saving...';
+    await saveData();
+    setTimeout(() => { saveBtn.textContent = originalText; }, 1000);
+  });
+
   const saveData = async () => {
     const pageFile = pages[currentPageIndex]?.fileName;
     if (!pageFile) return;
@@ -161,7 +188,27 @@ function initTranslateView(startingIndex: number) {
     }
   };
 
-  activeView = { name: 'translate', saveData };
+  activeView = {
+    name: 'translate',
+    saveData,
+    onKeydown: (e: KeyboardEvent) => {
+      // Undo drawing
+      if (e.ctrlKey && e.key === 'z') {
+        e.preventDefault();
+        if (drawingData.lines.length > 0) {
+          drawingData.lines.pop(); // Remove the last line
+          redrawCanvas();        // Redraw the canvas
+          saveData();            // Save the change
+        }
+      }
+      // Page navigation
+      if (e.key === 'ArrowRight') {
+        nextBtn.click();
+      } else if (e.key === 'ArrowLeft') {
+        prevBtn.click();
+      }
+    },
+  };
 
   const loadPage = async (index: number) => {
     if (index < 0 || index >= pages.length) return;
@@ -221,6 +268,7 @@ function initTranslateView(startingIndex: number) {
 function initProofreadView(startingIndex: number) {
   let currentPageIndex = startingIndex;
   const pageIndicator = document.getElementById('proofread-page-indicator') as HTMLSpanElement;
+  const saveBtn = document.getElementById('proofread-save-btn') as HTMLButtonElement;
   const rawImage = document.getElementById('proofread-raw-image') as HTMLImageElement;
   const tsImage = document.getElementById('proofread-ts-image') as HTMLImageElement;
   const annotationsText = document.getElementById('proofread-text') as HTMLTextAreaElement;
@@ -228,6 +276,13 @@ function initProofreadView(startingIndex: number) {
   const prevBtn = document.getElementById('proofread-prev-btn') as HTMLButtonElement;
   const correctBtn = document.getElementById('proofread-correct-btn') as HTMLButtonElement;
   const closeBtn = document.querySelector('.gallery-close-btn') as HTMLAnchorElement;
+
+  saveBtn.addEventListener('click', async () => {
+      const originalText = saveBtn.textContent;
+      saveBtn.textContent = 'Saving...';
+      await saveAnnotations();
+      setTimeout(() => { saveBtn.textContent = originalText; }, 1000);
+    });
 
   const saveAnnotations = async () => {
     if (!pages[currentPageIndex]) return;
@@ -241,7 +296,17 @@ function initProofreadView(startingIndex: number) {
     }
   };
 
-  activeView = { name: 'proofread', saveData: saveAnnotations };
+  activeView = {
+    name: 'proofread',
+    saveData: saveAnnotations,
+    onKeydown: (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') {
+        nextBtn.click();
+      } else if (e.key === 'ArrowLeft') {
+        prevBtn.click();
+      }
+    },
+  };
 
   const loadPage = async (index: number) => {
     if (index < 0 || index >= pages.length) return;
@@ -281,25 +346,67 @@ function initProofreadView(startingIndex: number) {
 
 function initTypesetView(startingIndex: number) {
   let currentPageIndex = startingIndex;
-  activeView = { name: 'typeset', saveData: async () => {} };
+  let currentImageType: 'cleaned' | 'raw' = 'cleaned'; // Default to cleaned
+  activeView = {
+    name: 'typeset',
+    saveData: async () => {},
+    onKeydown: (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') {
+        nextBtn.click();
+      } else if (e.key === 'ArrowLeft') {
+        prevBtn.click();
+      }
+    },
+  };
+
   const pageIndicator = document.getElementById('typeset-page-indicator') as HTMLSpanElement;
-  const cleanedImage = document.getElementById('typeset-cleaned-image') as HTMLImageElement;
+  const mainImage = document.getElementById('typeset-image') as HTMLImageElement;
   const translationTextDiv = document.getElementById('typeset-translation-text') as HTMLDivElement;
   const nextBtn = document.getElementById('typeset-next-btn') as HTMLButtonElement;
   const prevBtn = document.getElementById('typeset-prev-btn') as HTMLButtonElement;
   const closeBtn = document.querySelector('.gallery-close-btn') as HTMLAnchorElement;
+  const showCleanedBtn = document.getElementById('show-cleaned-btn') as HTMLButtonElement;
+  const showRawBtn = document.getElementById('show-raw-btn') as HTMLButtonElement;
+
+  const updateImageView = () => {
+    const page = pages[currentPageIndex];
+    if (!page) return;
+
+    if (currentImageType === 'cleaned') {
+      const cleanedPath = `${currentChapterPath}/Raws Cleaned/${page.fileName}`.replace(/\\/g, '/');
+      mainImage.src = `scanstation-asset:///${cleanedPath}`;
+      showCleanedBtn.classList.add('active');
+      showRawBtn.classList.remove('active');
+    } else { // raw
+      const rawPath = `${currentChapterPath}/Raws/${page.fileName}`.replace(/\\/g, '/');
+      mainImage.src = `scanstation-asset:///${rawPath}`;
+      showRawBtn.classList.add('active');
+      showCleanedBtn.classList.remove('active');
+    }
+    mainImage.onerror = () => { mainImage.src = ''; };
+  };
 
   const loadPage = async (index: number) => {
     if (index < 0 || index >= pages.length) return;
     currentPageIndex = index;
     const page = pages[currentPageIndex];
     pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
-    const cleanedPath = `${currentChapterPath}/Raws Cleaned/${page.fileName}`.replace(/\\/g, '/');
-    cleanedImage.src = `scanstation-asset:///${cleanedPath}`;
-    cleanedImage.onerror = () => { cleanedImage.src = ''; };
+    
+    updateImageView(); // This will set the image source
+
     const translatedText = await window.api.getFileContent(`${currentChapterPath}/data/TL Data/${page.fileName}.txt`);
     translationTextDiv.textContent = translatedText || 'No translation text found for this page.';
   };
+
+  showCleanedBtn.addEventListener('click', () => {
+    currentImageType = 'cleaned';
+    updateImageView();
+  });
+
+  showRawBtn.addEventListener('click', () => {
+    currentImageType = 'raw';
+    updateImageView();
+  });
 
   closeBtn.addEventListener('click', (e) => { e.preventDefault(); showHomeView(); });
   nextBtn.addEventListener('click', () => loadPage(currentPageIndex + 1));
@@ -308,7 +415,8 @@ function initTypesetView(startingIndex: number) {
   document.querySelectorAll('.external-editor-buttons button').forEach(button => {
     button.addEventListener('click', () => {
       const editor = (button as HTMLElement).dataset.editor;
-      const filePath = `${currentChapterPath}/Raws Cleaned/${pages[currentPageIndex].fileName}`;
+      const folder = currentImageType === 'cleaned' ? 'Raws Cleaned' : 'Raws';
+      const filePath = `${currentChapterPath}/${folder}/${pages[currentPageIndex].fileName}`;
       window.api.openFileInEditor({ editor, filePath });
     });
   });

@@ -18,11 +18,11 @@ contextBridge.exposeInMainWorld('api', {
   openFileInEditor: (data) => ipcRenderer.invoke('open-file-in-editor', data),
 
   // --- Settings Window ---
-openSettingsWindow: () => ipcRenderer.send('open-settings-window'),
-closeSettingsWindow: () => ipcRenderer.send('close-settings-window'),
-getEditorPaths: () => ipcRenderer.invoke('get-editor-paths'),
-selectEditorPath: () => ipcRenderer.invoke('select-editor-path'),
-setEditorPath: (data) => ipcRenderer.invoke('set-editor-path', data),
+  openSettingsWindow: () => ipcRenderer.send('open-settings-window'),
+  closeSettingsWindow: () => ipcRenderer.send('close-settings-window'),
+  getEditorPaths: () => ipcRenderer.invoke('get-editor-paths'),
+  selectEditorPath: () => ipcRenderer.invoke('select-editor-path'),
+  setEditorPath: (data) => ipcRenderer.invoke('set-editor-path', data),
 
   // Add this with your other API definitions
   onStatusUpdate: (callback) => ipcRenderer.on('status-update', (_event, message) => callback(message)),
@@ -75,4 +75,8 @@ setEditorPath: (data) => ipcRenderer.invoke('set-editor-path', data),
   // --- Universal APIs (Used by multiple windows) ---
   selectCoverImage: () => ipcRenderer.send('select-cover-image'),
   onCoverImageSelected: (callback) => ipcRenderer.on('cover-image-selected', (_event, path) => callback(path)),
+
+  openChapterFolder: (chapterPath) => ipcRenderer.send('open-chapter-folder', chapterPath),
+  healChapterFolders: (chapterPath) => ipcRenderer.invoke('heal-chapter-folders', chapterPath), // Add this line
+  getChapterPageStatus: (chapterPath) => ipcRenderer.invoke('get-chapter-page-status', chapterPath),
 });
