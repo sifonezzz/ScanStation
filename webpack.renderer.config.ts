@@ -18,14 +18,12 @@ rules.push({
 });
 
 const rendererConfig = {
+  target: 'electron-renderer',
   module: {
     rules,
   },
   // Add this 'node' object
-  node: {
-    __dirname: false,
-    __filename: false,
-  },
+
   plugins,
   resolve: {
     extensions: ['.js', '.ts', '.jsx', '.tsx', '.css'],

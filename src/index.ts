@@ -4,7 +4,7 @@ import { app, BrowserWindow, ipcMain, dialog, protocol, session, shell } from 'e
 import path from 'path';
 import fs from 'fs-extra';
 import simpleGit, { SimpleGit } from 'simple-git';
-import Jimp from 'jimp';
+import * as Jimp from 'jimp';
 import { getSetting, setSetting, deleteSetting } from './settings';
 import { execFile } from 'child_process';
 
@@ -192,7 +192,7 @@ async function initializeNewProject(projectPath: string, coverImagePath: string)
   } catch (error) {
     dialog.showErrorBox('Project Creation Failed', `An error occurred: ${error.message}`);
   }
-}}
+}
 
 function openCreateProjectWindow(repoName: string) {
   const mainWindow = BrowserWindow.getAllWindows()[0];
@@ -952,6 +952,7 @@ const createWindow = (): BrowserWindow => {
     backgroundColor: '#23272a',
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
+      sandbox: false,
     },
   });
 
