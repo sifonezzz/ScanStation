@@ -5,7 +5,6 @@ rules.push({
   test: /\.css$/,
   use: [{ loader: 'style-loader' }, { loader: 'css-loader' }],
 });
-
 rules.push({
   test: /\.html$/,
   use: {
@@ -21,6 +20,11 @@ rules.push({
 const rendererConfig = {
   module: {
     rules,
+  },
+  // Add this 'node' object
+  node: {
+    __dirname: false,
+    __filename: false,
   },
   plugins,
   resolve: {

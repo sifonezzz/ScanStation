@@ -4,7 +4,7 @@ import { app, BrowserWindow, ipcMain, dialog, protocol, session, shell } from 'e
 import path from 'path';
 import fs from 'fs-extra';
 import simpleGit, { SimpleGit } from 'simple-git';
-import sharp from 'sharp';
+import Jimp from 'jimp';
 import { getSetting, setSetting, deleteSetting } from './settings';
 import { execFile } from 'child_process';
 
@@ -184,14 +184,15 @@ async function refreshChapters(targetWindow: BrowserWindow, repoName: string, pr
 async function initializeNewProject(projectPath: string, coverImagePath: string): Promise<void> {
   try {
     await fs.ensureDir(projectPath);
-    await sharp(coverImagePath)
-      .resize(512, 728, { fit: 'cover' })
-      .jpeg({ quality: 90 })
-      .toFile(path.join(projectPath, 'cover.jpg'));
+    const image = await Jimp.read(coverImagePath);
+    await image
+      .cover(512, 728) // Resizes and crops to fit the dimensions
+      .quality(90) // Sets JPEG quality
+      .writeAsync(path.join(projectPath, 'cover.jpg')); // Saves the file
   } catch (error) {
     dialog.showErrorBox('Project Creation Failed', `An error occurred: ${error.message}`);
   }
-}
+}}
 
 function openCreateProjectWindow(repoName: string) {
   const mainWindow = BrowserWindow.getAllWindows()[0];
@@ -425,6 +426,7 @@ ipcMain.handle('submit-project-update', async (_, data) => {
   const repoPath = path.join(getStoragePath(), repoName);
   const originalPath = path.join(repoPath, originalName);
   const newPath = path.join(repoPath, newName);
+
   try {
     if (newName !== originalName) {
       if (await fs.pathExists(newPath)) {
@@ -433,16 +435,20 @@ ipcMain.handle('submit-project-update', async (_, data) => {
       }
       await fs.rename(originalPath, newPath);
     }
+
     if (newCoverPath) {
-      await sharp(newCoverPath)
-        .resize(512, 728, { fit: 'cover' })
-        .jpeg({ quality: 90 })
-        .toFile(path.join(newPath, 'cover.jpg'));
+      const image = await Jimp.read(newCoverPath);
+      await image
+        .cover(512, 728)
+        .quality(90)
+        .writeAsync(path.join(newPath, 'cover.jpg'));
     }
+
     if (editProjectWindow) editProjectWindow.close();
     const mainWindow = BrowserWindow.getAllWindows()[0];
     if (mainWindow) loadProjects(mainWindow, repoName);
     return { success: true };
+    
   } catch (error) {
     dialog.showErrorBox('Update Failed', `An error occurred. Error: ${error.message}`);
     return { success: false };
