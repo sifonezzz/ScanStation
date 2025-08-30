@@ -1,3 +1,12 @@
+import type { Editor } from './types';
+import type { IScanstationAPI } from './types';
+
+declare global {
+  interface Window {
+    api: IScanstationAPI;
+  }
+}
+
 import translateViewHtml from './translate-view.html';
 import proofreadViewHtml from './proofread-view.html';
 import typesetViewHtml from './typeset-view.html';
@@ -414,7 +423,7 @@ function initTypesetView(startingIndex: number) {
 
   document.querySelectorAll('.external-editor-buttons button').forEach(button => {
     button.addEventListener('click', () => {
-      const editor = (button as HTMLElement).dataset.editor;
+      const editor = (button as HTMLElement).dataset.editor as Editor;
       const folder = currentImageType === 'cleaned' ? 'Raws Cleaned' : 'Raws';
       const filePath = `${currentChapterPath}/${folder}/${pages[currentPageIndex].fileName}`;
       window.api.openFileInEditor({ editor, filePath });

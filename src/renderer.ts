@@ -1,39 +1,9 @@
+import type { Editor } from './types';
+import type { IScanstationAPI } from './types';
+
 declare global {
   interface Window {
-    api: {
-      // Main screen APIs
-      createProject: (repoName: string) => void;
-      onProjectsLoaded: (callback: (projects: Project[]) => void) => void;
-      openProject: (repoName: string, projectName: string) => void;
-      deleteProject: (repoName: string, projectName: string) => Promise<void>;
-      openEditProjectWindow: (repoName: string, projectName: string) => void;
-      loadProjects: (repoName: string) => void;
-      getRepositories: () => Promise<{ repositories: string[], selected: string | null }>;
-      setSelectedRepository: (repoName: string) => void;
-      addRepository: (repoUrl: string) => Promise<{ success: boolean, repoName?: string }>;
-      getPatStatus: () => Promise<boolean>;
-      setPat: (token: string) => Promise<void>;
-      removePat: () => Promise<void>;
-
-      // Navigation APIs
-      onShowChapterScreen: (callback: (data: { repoName: string, projectName: string }) => void) => void;
-      onShowProjectScreen: (callback: () => void) => void;
-
-      // Chapter screen APIs
-      getChapters: (repoName: string, projectName: string) => void;
-      onChaptersLoaded: (callback: (chapters: { name: string }[]) => void) => void;
-      openCreateChapterWindow: (repoName: string, projectName: string) => void;
-      goBackToProjects: () => void;
-      gitStatus: (repoName: string) => Promise<any>;
-      gitCommit: (repoName: string, message: string) => Promise<any>;
-      gitPush: (repoName: string) => Promise<any>;
-      gitPull: (repoName: string) => Promise<{ success: boolean, message?: string }>;
-      gitSyncRepository: (repoName: string) => Promise<{ success: boolean, message?: string }>;
-    };
-  }
-  interface Project {
-    name: string;
-    coverPath: string;
+    api: IScanstationAPI;
   }
 }
 
@@ -115,7 +85,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
   backBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      window.api.goBackToProjects();
+      // This function requires the repo and project name to know where to go back to
+      window.api.goBackToProjects(currentRepoName, currentProjectName);
   });
 
   statusBtn.addEventListener('click', async () => {
@@ -384,7 +355,7 @@ function showChapterSelection(repoName: string, projectName: string) {
   document.body.appendChild(chapterSelectionContainer);
 
   // 6. Listen for chapters and render them.
-  const removeListener = window.api.onChaptersLoaded((chapters) => {
+  window.api.onChaptersLoaded((chapters) => {
     chapterGrid.innerHTML = '';
     if (chapters.length === 0) {
       chapterGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">No chapters found for this project.</p>`;
@@ -393,13 +364,13 @@ function showChapterSelection(repoName: string, projectName: string) {
         const card = document.createElement('div');
         card.className = 'chapter-card';
         card.textContent = chapter.name.replace(/_/g, ' ');
-        card.addEventListener('click', () => {
+      
+          card.addEventListener('click', () => {
           window.api.openProject(repoName, projectName, chapter.name);
         });
         chapterGrid.appendChild(card);
       }
     }
-    removeListener();
   });
 
   window.api.getChapters(repoName, projectName);

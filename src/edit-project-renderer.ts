@@ -1,22 +1,13 @@
-// REPLACE THE ENTIRE CONTENT of src/edit-project-renderer.ts WITH THIS:
+// REPLACE THE ENTIRE CONTENT of this file WITH THIS:
+// (Notice the instructional comment and the "declare global" block are both gone)
+import type { Editor } from './types';
+import type { IScanstationAPI } from './types';
 
 declare global {
   interface Window {
-    api: {
-      onProjectDataForEdit: (callback: (data: { name: string; coverPath: string; repoName: string }) => void) => void;
-      selectCoverImage: () => void;
-      onCoverImageSelected: (callback: (path: string) => void) => void;
-      submitProjectUpdate: (data: {
-        repoName: string;
-        originalName: string;
-        newName: string;
-        newCoverPath: string | null;
-      }) => Promise<{ success: boolean }>;
-      cancelProjectUpdate: () => void;
-    };
+    api: IScanstationAPI;
   }
 }
-
 let currentRepoName: string | null = null;
 let originalProjectName: string | null = null;
 let newCoverPath: string | null = null;

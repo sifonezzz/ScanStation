@@ -1,7 +1,7 @@
 import * as Store from 'electron-store';
 
 // Replace the AppStore interface with this
-interface AppStore {
+export interface AppStore {
   initialSetupComplete?: boolean;
   projectStoragePath?: string;
   githubToken?: string;

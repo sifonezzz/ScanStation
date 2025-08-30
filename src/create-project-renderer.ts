@@ -1,12 +1,9 @@
+import type { Editor } from './types';
+import type { IScanstationAPI } from './types';
+
 declare global {
   interface Window {
-    api: {
-      onProjectDataForCreateProject: (callback: (data: { repoName: string }) => void) => void;
-      selectCoverImage: () => void;
-      onCoverImageSelected: (callback: (path: string) => void) => void;
-      submitProjectCreation: (data: { repoName: string; name: string; path: string }) => void;
-      cancelProjectCreation: () => void;
-    };
+    api: IScanstationAPI;
   }
 }
 

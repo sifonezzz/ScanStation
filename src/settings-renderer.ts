@@ -1,18 +1,12 @@
+import type { Editor } from './types';
+import type { IScanstationAPI } from './types';
+
 declare global {
   interface Window {
-    api: {
-      getEditorPaths: () => Promise<{ [key: string]: string }>;
-      selectEditorPath: () => Promise<string | null>;
-      setEditorPath: (data: { editor: string, path: string }) => void;
-      closeSettingsWindow: () => void;
-      // APIs moved from main renderer
-      getPatStatus: () => Promise<boolean>;
-      removePat: () => Promise<void>;
-      setPat: (token: string) => Promise<void>;
-      addRepository: (url: string) => Promise<{ success: boolean }>;
-    };
+    api: IScanstationAPI;
   }
 }
+
 
 let hasPat = false;
 
@@ -22,24 +16,26 @@ window.addEventListener('DOMContentLoaded', async () => {
     doneBtn.addEventListener('click', () => window.api.closeSettingsWindow());
 
     // --- Editor Path Logic ---
-    const inputs = {
+    const inputs: { [key in Editor]: HTMLInputElement } = {
         photoshop: document.getElementById('photoshopPath') as HTMLInputElement,
         illustrator: document.getElementById('illustratorPath') as HTMLInputElement,
         gimp: document.getElementById('gimpPath') as HTMLInputElement,
     };
     const currentPaths = await window.api.getEditorPaths();
     for (const editor in currentPaths) {
-        if (inputs[editor] && currentPaths[editor]) {
-            inputs[editor].value = currentPaths[editor];
+        // Cast the key to a type that can index the 'inputs' object
+        const key = editor as keyof typeof inputs;
+        if (inputs[key] && currentPaths[key]) {
+            inputs[key].value = currentPaths[key];
         }
     }
     document.querySelectorAll('.browse-btn').forEach(button => {
         button.addEventListener('click', async () => {
-            const editor = (button as HTMLElement).dataset.editor;
+            const editor = (button as HTMLElement).dataset.editor as Editor;
             const selectedPath = await window.api.selectEditorPath();
             if (selectedPath) {
                 inputs[editor].value = selectedPath;
-                window.api.setEditorPath({ editor, path: selectedPath });
+                window.api.setEditorPath({ editor: editor, path: selectedPath });
             }
         });
     });

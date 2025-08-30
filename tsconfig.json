@@ -20,5 +20,8 @@
       "*": ["node_modules/*"]
     }
   },
+   "files": [
+    "src/types.d.ts"
+  ],
   "include": ["src/**/*"]
 }

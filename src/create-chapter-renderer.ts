@@ -1,16 +1,9 @@
+import type { Editor } from './types';
+import type { IScanstationAPI } from './types';
+
 declare global {
   interface Window {
-    api: {
-      onProjectDataForCreateChapter: (callback: (data: { repoName: string, projectName: string }) => void) => void;
-      submitChapterCreation: (data: {
-        repoName: string;
-        projectName: string;
-        chapterNumber: string;
-        chapterName: string;
-        includeFinal: boolean;
-      }) => Promise<{ success: boolean }>;
-      cancelChapterCreation: () => void;
-    };
+    api: IScanstationAPI;
   }
 }
 

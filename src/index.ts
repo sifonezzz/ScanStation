@@ -1,3 +1,5 @@
+import { AppStore } from './settings';
+
 import { app, BrowserWindow, ipcMain, dialog, protocol, session, shell } from 'electron';
 import path from 'path';
 import fs from 'fs-extra';
@@ -100,7 +102,8 @@ ipcMain.handle('select-editor-path', async () => {
     return !canceled && filePaths.length > 0 ? filePaths[0] : null;
 });
 ipcMain.handle('set-editor-path', (_, { editor, path }: { editor: string, path: string }) => {
-    setSetting(`${editor}Path`, path);
+    const key = `${editor}Path` as keyof AppStore;
+    setSetting(key, path);
 });
 
 async function loadProjects(mainWindow: BrowserWindow, repositoryName: string) {
@@ -266,7 +269,8 @@ ipcMain.on('cancel-project-creation', () => {
 });
 
 ipcMain.handle('open-file-in-editor', async (_, { editor, filePath }: { editor: string, filePath: string }) => {
-    const editorPath = getSetting<string>(`${editor}Path`);
+    const key = `${editor}Path` as keyof AppStore;
+    const editorPath = getSetting<string>(key);
 
     if (!editorPath) {
         dialog.showMessageBox({
