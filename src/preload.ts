@@ -1,10 +1,6 @@
-// REPLACE THE ENTIRE CONTENT of src/preload.ts WITH THIS:
-import type { IScanstationAPI } from './types';
+// REPLACE THE ENTIRE CONTENT of this file with this:
 import { contextBridge, ipcRenderer } from 'electron';
-
-// Define types for data objects to make the API clearer
-type Project = { name: string; coverPath: string; };
-type Chapter = { name: string; };
+import type { IScanstationAPI, Project, Chapter } from './types';
 
 const api: IScanstationAPI = {
   // --- Main Window ---
@@ -76,3 +72,5 @@ const api: IScanstationAPI = {
   selectCoverImage: () => ipcRenderer.send('select-cover-image'),
   onCoverImageSelected: (callback: (path: string) => void) => ipcRenderer.on('cover-image-selected', (_event, path) => callback(path)),
 };
+
+contextBridge.exposeInMainWorld('api', api);

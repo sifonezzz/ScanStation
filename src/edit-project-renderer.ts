@@ -1,13 +1,9 @@
 // REPLACE THE ENTIRE CONTENT of this file WITH THIS:
 // (Notice the instructional comment and the "declare global" block are both gone)
-import type { Editor } from './types';
-import type { IScanstationAPI } from './types';
 
-declare global {
-  interface Window {
-    api: IScanstationAPI;
-  }
-}
+import type { IScanstationAPI, Editor } from './types';
+
+declare const api: IScanstationAPI;
 let currentRepoName: string | null = null;
 let originalProjectName: string | null = null;
 let newCoverPath: string | null = null;

@@ -1,11 +1,7 @@
-import type { Editor } from './types';
-import type { IScanstationAPI } from './types';
 
-declare global {
-  interface Window {
-    api: IScanstationAPI;
-  }
-}
+import type { IScanstationAPI, Editor } from './types';
+
+declare const api: IScanstationAPI;
 
 let selectedCoverPath: string | null = null;
 let currentRepoName: string | null = null;

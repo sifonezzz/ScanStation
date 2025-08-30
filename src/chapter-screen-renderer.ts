@@ -1,11 +1,7 @@
-import type { Editor } from './types';
-import type { IScanstationAPI } from './types';
 
-declare global {
-  interface Window {
-    api: IScanstationAPI;
-  }
-}
+import type { IScanstationAPI, Editor } from './types';
+
+declare const api: IScanstationAPI;
 
 import translateViewHtml from './translate-view.html';
 import proofreadViewHtml from './proofread-view.html';
