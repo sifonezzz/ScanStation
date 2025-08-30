@@ -17,6 +17,8 @@ A collaboration tool for solo and group scanlation projects.
 ---
 ## Usage
 
+The first time you open the app a green box will appear, wait a few seconds for the app to finish installing, do not use the app during this period.
+
 ### Step 1: Initial Setup
 The first time you launch Scanstation, you will be prompted to select a folder on your computer where all your project data will be stored. After that, the first thing you should do is configure your settings.
 1.  Click the **Settings** button on the main screen.
