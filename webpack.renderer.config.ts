@@ -22,11 +22,13 @@ const rendererConfig = {
   module: {
     rules,
   },
-  // Add this 'node' object
-
   plugins,
   resolve: {
     extensions: ['.js', '.ts', '.jsx', '.tsx', '.css'],
+    // Add this fallback to solve 'require is not defined' error
+    fallback: {
+      "events": require.resolve("events/"),
+    }
   },
 };
 

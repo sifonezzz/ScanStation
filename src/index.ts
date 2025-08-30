@@ -953,10 +953,14 @@ const createWindow = (): BrowserWindow => {
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       sandbox: false,
+      // Add these two lines:
+      contextIsolation: true,
+      nodeIntegration: false,
     },
   });
 
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+  mainWindow.webContents.openDevTools();
   
   mainWindow.once('ready-to-show', () => {
     const selectedRepo = getSetting<string>('selectedRepository');

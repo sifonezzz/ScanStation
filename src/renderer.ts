@@ -287,81 +287,46 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 function showChapterSelection(repoName: string, projectName: string) {
-  // 1. Get a reference to the main project screen and hide it.
+  // Store the current project context
+  currentRepoName = repoName;
+  currentProjectName = projectName;
+
+  // Get the screen containers that already exist in index.html
   const projectScreen = document.getElementById('project-screen');
-  if (projectScreen) {
-    projectScreen.style.display = 'none';
+  const chapterScreen = document.getElementById('chapter-screen');
+  
+  // Get elements from the existing chapter screen to populate them
+  const projectNameHeader = document.getElementById('project-name-header');
+  const chapterGrid = document.getElementById('chapter-grid');
+
+  // Ensure all elements were found before proceeding
+  if (!projectScreen || !chapterScreen || !projectNameHeader || !chapterGrid) {
+    console.error('Could not find required elements to show chapter screen.');
+    return;
   }
 
-  // 2. Create a new, dedicated container for chapter selection.
-  const chapterSelectionContainer = document.createElement('div');
-  chapterSelectionContainer.id = 'chapter-selection-screen';
+  // 1. Hide the project screen and show the chapter screen
+  projectScreen.style.display = 'none';
+  chapterScreen.style.display = 'block'; // Use 'block' or 'flex' as appropriate
 
-  // 3. Create the new, correct header for this screen.
-  const header = document.createElement('div');
-  header.className = 'header';
+  // 2. Set the header title
+  projectNameHeader.textContent = projectName;
 
-  // --- Header Left Side (Back button and Title) ---
-  const headerLeft = document.createElement('div');
-  headerLeft.className = 'header-left';
-  
-  const backBtn = document.createElement('a');
-  backBtn.href = '#';
-  backBtn.className = 'back-btn';
-  backBtn.innerHTML = '&larr;';
-  backBtn.style.fontSize = '24px';
-  backBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    chapterSelectionContainer.remove();
-    if (projectScreen) {
-      projectScreen.style.display = 'block';
-    }
-  });
-
-  const title = document.createElement('h1');
-  title.textContent = projectName;
-  headerLeft.appendChild(backBtn);
-  headerLeft.appendChild(title);
-
-  // --- Header Right Side (+ New Chapter Button) ---
-  const headerRight = document.createElement('div');
-  headerRight.className = 'header-buttons'; // Re-use existing class for styling
-
-  const createChapterBtn = document.createElement('button');
-  createChapterBtn.id = 'create-chapter-btn';
-  createChapterBtn.textContent = '+ New Chapter';
-  createChapterBtn.addEventListener('click', () => {
-    // This calls the API to open the "Create New Chapter" modal window
-    window.api.openCreateChapterWindow(repoName, projectName);
-  });
-  headerRight.appendChild(createChapterBtn);
-  
-  // Add both sides to the header
-  header.appendChild(headerLeft);
-  header.appendChild(headerRight);
-
-  // 4. Create the grid for the chapters.
-  const chapterGrid = document.createElement('div');
-  chapterGrid.className = 'chapter-grid';
+  // 3. Clear the grid and show a loading message
   chapterGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">Loading chapters...</p>`;
 
-  // 5. Assemble the new screen and add it to the page.
-  chapterSelectionContainer.appendChild(header);
-  chapterSelectionContainer.appendChild(chapterGrid);
-  document.body.appendChild(chapterSelectionContainer);
-
-  // 6. Listen for chapters and render them.
+  // 4. Listen for the chapter data and render it
   window.api.onChaptersLoaded((chapters) => {
-    chapterGrid.innerHTML = '';
+    chapterGrid.innerHTML = ''; // Clear loading message
     if (chapters.length === 0) {
-      chapterGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">No chapters found for this project.</p>`;
+      chapterGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">No chapters found. Click '+ New Chapter' to get started!</p>`;
     } else {
       for (const chapter of chapters) {
         const card = document.createElement('div');
         card.className = 'chapter-card';
         card.textContent = chapter.name.replace(/_/g, ' ');
-      
-          card.addEventListener('click', () => {
+        // When a chapter is clicked, navigate the main window to the workspace view
+        card.addEventListener('click', () => {
           window.api.openProject(repoName, projectName, chapter.name);
         });
         chapterGrid.appendChild(card);
@@ -369,6 +334,7 @@ function showChapterSelection(repoName: string, projectName: string) {
     }
   });
 
+  // 5. Request the chapters for the selected project
   window.api.getChapters(repoName, projectName);
 }
 export {};
