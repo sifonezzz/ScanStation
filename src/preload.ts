@@ -26,6 +26,7 @@ const api: IScanstationAPI = {
   getEditorPaths: () => ipcRenderer.invoke('get-editor-paths'),
   selectEditorPath: () => ipcRenderer.invoke('select-editor-path'),
   setEditorPath: (data: any) => ipcRenderer.invoke('set-editor-path', data),
+  createDesktopShortcut: () => ipcRenderer.invoke('create-shortcut'),
 
   // --- Splash Window ---
   onStatusUpdate: (callback: (message: string) => void) => ipcRenderer.on('status-update', (_event, message) => callback(message)),

@@ -17,6 +17,16 @@ window.addEventListener('DOMContentLoaded', async () => {
         illustrator: document.getElementById('illustratorPath') as HTMLInputElement,
         gimp: document.getElementById('gimpPath') as HTMLInputElement,
     };
+    const createShortcutBtn = document.getElementById('create-shortcut-btn');
+        createShortcutBtn.addEventListener('click', async () => {
+            const result = await window.api.createDesktopShortcut();
+            if (result.success) {
+                alert('Desktop shortcut created successfully!');
+            } else {
+                alert(`Failed to create shortcut: ${result.error}`);
+            }
+        });
+
     const currentPaths = await window.api.getEditorPaths();
     for (const editor in currentPaths) {
         // Cast the key to a type that can index the 'inputs' object

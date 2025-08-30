@@ -114,6 +114,35 @@ ipcMain.handle('set-editor-path', (_, { editor, path }: { editor: string, path: 
     setSetting(key, path);
 });
 
+// src/index.ts
+
+ipcMain.handle('create-shortcut', async () => {
+    try {
+        const shortcutPath = path.join(app.getPath('desktop'), 'Scanstation.lnk');
+        const targetPath = app.getPath('exe');
+
+        if (process.platform === 'win32') {
+            const success = shell.writeShortcutLink(shortcutPath, 'create', {
+                target: targetPath,
+                description: 'A collaboration tool for solo and group scanlation projects.',
+                icon: targetPath,
+                iconIndex: 0,
+                appUserModelId: 'com.sifonezzz.scanstation'
+            });
+
+            if (success) {
+                return { success: true };
+            } else {
+                return { success: false, error: 'The OS failed to write the shortcut link.' };
+            }
+        }
+        return { success: false, error: 'Shortcut creation is only supported on Windows.' };
+    } catch (error) {
+        console.error('Failed to create shortcut:', error);
+        return { success: false, error: error.message };
+    }
+});
+
 async function loadProjects(mainWindow: BrowserWindow, repositoryName: string) {
   if (!mainWindow || mainWindow.isDestroyed() || !repositoryName) {
     if (mainWindow && !mainWindow.isDestroyed()) {

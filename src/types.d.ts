@@ -72,6 +72,7 @@ export interface IScanstationAPI {
   // Universal APIs
   selectCoverImage: () => void;
   onCoverImageSelected: (callback: (path: string) => void) => void;
+  createDesktopShortcut: () => Promise<{ success: boolean; error?: string }>;
 }
 
 // This is the new part that fixes the errors
