@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <title>Chapters</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        margin: 0; background-color: #23272a; color: #ffffff; }
+        .header { display: flex; justify-content: space-between;
+        align-items: center; padding: 16px 24px; background-color: #2c2f33; border-bottom: 1px solid #4a4d52;
+        }
+        .header-left { display: flex; align-items: center; gap: 15px;
+        }
+        .back-btn { font-size: 24px; color: white; text-decoration: none; font-weight: bold;
+        }
+        .header h1 { margin: 0; font-size: 20px;
+        }
+        #create-chapter-btn { padding: 8px 16px; font-size: 14px; background-color: #7289da; color: white;
+        border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        #chapter-grid { display: flex;
+        flex-direction: column; gap: 12px; padding: 24px; }
+        .chapter-card { background-color: #2c2f33; border-radius: 8px;
+        padding: 16px 20px; font-size: 16px; cursor: pointer; transition: background-color 0.2s;
+        }
+        .chapter-card:hover { background-color: #3b3e44;
+        }
+
+        /* New Git UI Styles */
+        .git-container { padding: 24px;
+        border-bottom: 1px solid #4a4d52;}
+        .git-header { display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 15px; }
+        .git-header h2 { margin: 0; font-size: 18px;
+        }
+        .git-buttons button { padding: 8px 16px; font-size: 14px; border: none; border-radius: 4px;
+        cursor: pointer; font-weight: bold; }
+        #git-status-btn { background-color: #4a4d52; color: white;
+        }
+        #git-push-btn { background-color: #43b581; color: white;
+        }
+        #git-changed-files { background-color: #23272a; border-radius: 4px; padding: 10px; min-height: 50px;
+            font-family: monospace;
+        font-size: 12px; color: #99aab5; margin-bottom: 15px; }
+        .commit-area { display: flex; gap: 10px;
+        }
+        #git-commit-message { flex-grow: 1; padding: 8px; border-radius: 4px; border: 1px solid #4a4d52;
+        background-color: #23272a; color: white; }
+        #git-commit-btn { background-color: #7289da; color: white;
+        }
+        .git-instructions {
+            font-size: 12px;
+            color: #99aab5;
+            text-align: center;
+            margin: -5px 0 15px 0;
+        }
+
+        .header-right { display: flex; align-items: center; gap: 10px; }
+        .action-btn { background-color: #43b581; color: white; padding: 8px 16px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .header-icon-btn { display: flex; align-items: center; justify-content: center; }
+        .chapter-workspace { display: flex; height: calc(100vh - 65px); }
+        .main-view { flex-grow: 1; padding: 24px; display: flex; justify-content: center; align-items: center; color: #99aab5; overflow-x: hidden; }
+        #pages-sidebar { width: 300px; background-color: #2c2f33; padding: 15px; border-left: 1px solid #4a4d52; overflow-y: auto; }
+        .sidebar-header { margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 1px solid #4a4d52; }
+        #page-list { display: flex; flex-direction: column; gap: 10px; }
+        .page-status-item { display: flex; align-items: center; justify-content: space-between; background-color: #23272a; padding: 8px 12px; border-radius: 4px; }
+        .page-status-item .page-name { font-weight: bold; }
+        .page-status-item .status-tags { display: flex; gap: 8px; font-size: 12px; }
+        .status-tag { padding: 2px 4px; border-radius: 3px; background-color: #4a4d52; }
+        .status-tag.checked { background-color: #43b581; color: white; }
+        .status-tag.circled { border: 1px solid #faa61a; background-color: transparent; color: #faa61a; }
+        /* --- Gallery View Styles --- */
+        #gallery-view-container { width: 100%; height: 100%; display: flex; flex-direction: column; }
+        .gallery-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; margin-bottom: 15px; border-bottom: 1px solid #4a4d52; }
+        .gallery-header h2 { margin: 0; }
+        .gallery-close-btn { font-size: 24px; color: #99aab5; text-decoration: none; font-weight: bold; cursor: pointer; }
+        .gallery-content { flex-grow: 1; display: flex; gap: 20px; overflow: hidden; }
+        .image-viewer { position: relative; flex-grow: 1; display: flex; justify-content: center; align-items: center; }
+        .image-viewer img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        #drawing-canvas {
+        position: absolute;
+        cursor: crosshair;
+        /* The top, left, width, and height will now be set by JavaScript */
+        }
+        .tools-panel { width: 300px; display: flex; flex-direction: column; }
+        .tools-panel textarea { width: 100%; flex-grow: 1; background-color: #23272a; border: 1px solid #4a4d52; color: white; border-radius: 4px; padding: 10px; font-family: monospace; font-size: 14px; resize: none; }
+        .gallery-footer {
+            display: flex;
+            justify-content: space-between; /* This will push the groups to opposite ends */
+            align-items: center;
+            gap: 15px;
+            padding-top: 15px;
+            margin-top: 15px;
+            border-top: 1px solid #4a4d52;
+        }    
+        .footer-nav-buttons {
+            display: flex;
+            gap: 15px;
+        }
+        .gallery-footer button { padding: 8px 24px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; background-color: #4a4d52; color: white; }
+        /* --- Proofread View Styles --- */
+        .gallery-content.proofread-layout-new {
+            flex-direction: column; /* Arrange items vertically */
+            gap: 15px;
+        }
+        .image-comparison-area {
+            display: flex;
+            gap: 15px;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+        .image-viewer-side {
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 0;
+        }
+        .image-viewer-side img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border: 1px solid #4a4d52;
+            border-radius: 4px;
+        }
+        .proofread-layout-new .tools-panel {
+            width: 100%;
+            height: 150px; /* Give the text box a fixed height */
+            flex-shrink: 0;
+        }
+        .image-label {
+            font-size: 12px;
+            color: #99aab5;
+            margin-bottom: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        #proofread-correct-btn {
+            background-color: #43b581;
+        }
+        .proofread-layout .tools-panel { width: 250px; }
+        .page-status-item.clickable {
+        cursor: pointer;
+        }
+        .page-status-item.clickable:hover {
+        background-color: #3b3e44;
+        }
+
+            /* --- Typeset View Styles --- */
+        .typeset-layout .tools-panel {
+            display: flex;
+            flex-direction: column;
+        }
+        .translation-display {
+            flex-grow: 1;
+            background-color: #23272a;
+            border: 1px solid #4a4d52;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            white-space: pre-wrap; /* Allows text to wrap */
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .external-editor-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .external-editor-buttons button {
+            padding: 10px;
+            font-weight: bold;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #4a4d52;
+            color: white;
+        }
+
+                /* --- Dashboard Styles --- */
+        .dashboard-container {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .progress-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .progress-bar-background {
+            width: 100%;
+            background-color: #23272a;
+            border-radius: 4px;
+            height: 20px;
+            overflow: hidden;
+        }
+        .progress-bar-foreground {
+            height: 100%;
+            background-color: #43b581;
+            border-radius: 4px;
+            transition: width 0.5s ease-in-out;
+            text-align: center;
+            line-height: 20px;
+            font-size: 12px;
+            color: white;
+            font-weight: bold;
+        }
+        .image-viewer {
+            position: relative; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .image-switcher {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        .switcher-btn {
+            padding: 6px 12px;
+            border: 1px solid #4a4d52;
+            background-color: transparent;
+            color: #99aab5;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .switcher-btn.active {
+            background-color: #7289da;
+            border-color: #7289da;
+            color: white;
+        }
+        .heal-btn {
+            background-color: #4CAF50; /* A shade of green */
+        }
+        .heal-btn:hover {
+            background-color: #45a049; /* Slightly darker green on hover */
+        }
+        .heal-btn svg {
+            fill: white; /* Ensure the SVG icon is white for contrast */
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <a href="#" id="back-to-projects-btn" class="back-btn">&larr;</a>
+            <h1 id="project-name-header"></h1>
+                <a href="#" id="open-folder-btn" class="header-icon-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="24px" height="24px"><path d="M10 4H4c-1.11 0-2 .89-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8c0-1.11-.9-2-2-2h-8l-2-2z"/></svg>
+            </a>
+            <a href="#" id="heal-folders-btn" class="header-icon-btn heal-btn" title="Heal Folders">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="white"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15H9v-2h2v2zm0-4H9V7h2v6zm4-2h-2v4h2v-4z"/></svg>
+            </a>
+            <a href="#" id="home-btn" class="header-icon-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="white"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5z"/></svg>
+             </a>
+        </div>
+        <div class="header-right">
+            <button id="translate-btn" class="action-btn">Translate</button>
+            <button id="proofread-btn" class="action-btn">Proofread</button>
+            <button id="typeset-btn" class="action-btn">Typeset</button>
+        </div>
+    </div>
+
+    <div class="chapter-workspace">
+        <div class="main-view">
+            <div id="gallery-view-container" style="display: none;"></div>
+            <p id="workspace-placeholder">Select an action like "Translate" or click a page to begin.</p>
+        </div>
+        <div id="pages-sidebar">
+            <h3 class="sidebar-header">Pages</h3>
+            <div id="page-list">
+                </div>
+        </div>
+    </div>
+</body>
+</html>
