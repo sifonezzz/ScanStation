@@ -4,18 +4,21 @@ import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import { WebpackPlugin } from '@electron-forge/plugin-webpack';
+import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 
 const config: ForgeConfig = {
-  packagerConfig: {},
+  packagerConfig: {
+    asar: true, // <-- Add this line
+  },
   rebuildConfig: {},
   makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
   plugins: [
+    new AutoUnpackNativesPlugin({}),
     new WebpackPlugin({
       mainConfig: './webpack.main.config.ts',
       renderer: {
         config: './webpack.renderer.config.ts',
         entryPoints: [
-
           // Inside the 'entryPoints' array in forge.config.ts
           {
             html: './src/splash.html',
@@ -27,12 +30,12 @@ const config: ForgeConfig = {
           },
           // Add this block inside the entryPoints array
           {
-              html: './src/settings.html',
-              js: './src/settings-renderer.ts',
-              name: 'settings_window',
-              preload: {
-                js: './src/preload.ts',
-              },
+            html: './src/settings.html',
+            js: './src/settings-renderer.ts',
+            name: 'settings_window',
+            preload: {
+              js: './src/preload.ts',
+            },
           },
           {
             html: './src/index.html',
