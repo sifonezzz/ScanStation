@@ -18,16 +18,16 @@ rules.push({
 });
 
 const rendererConfig = {
-  target: 'electron-renderer',
   module: {
     rules,
   },
   plugins,
   resolve: {
     extensions: ['.js', '.ts', '.jsx', '.tsx', '.css'],
-    // Add this fallback to solve 'require is not defined' error
+    // Add fallbacks for any Node.js core modules you need
     fallback: {
       "events": require.resolve("events/"),
+      "path": require.resolve("path-browserify")
     }
   },
 };

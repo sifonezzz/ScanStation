@@ -52,7 +52,9 @@ function createSplashWindow() {
     },
   });
   splashWindow.loadURL(SPLASH_WINDOW_WEBPACK_ENTRY);
-  splashWindow.on('closed', () => (splashWindow = null));
+  splashWindow.on('closed', (): void => {
+  splashWindow = null;
+});
 }
 
 
@@ -80,7 +82,9 @@ function openSettingsWindow() {
     });
     settingsWindow.loadURL(SETTINGS_WINDOW_WEBPACK_ENTRY); // Ensure this matches the name in forge.config.ts
     settingsWindow.once('ready-to-show', () => settingsWindow.show());
-    settingsWindow.on('closed', () => (settingsWindow = null));
+    settingsWindow.on('closed', (): void => {
+    settingsWindow = null;
+    });
 }
 
 ipcMain.on('open-settings-window', openSettingsWindow);
@@ -960,7 +964,7 @@ const createWindow = (): BrowserWindow => {
   });
 
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
-  mainWindow.webContents.openDevTools();
+  
   
   mainWindow.once('ready-to-show', () => {
     const selectedRepo = getSetting<string>('selectedRepository');
