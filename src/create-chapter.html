@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <title>Create New Chapter</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 24px; background-color: #2c2f33; color: #ffffff; -webkit-app-region: drag; }
+        .form-container { -webkit-app-region: no-drag; }
+        h2 { text-align: center; margin-top: 0;}
+        .form-group { margin-bottom: 15px; }
+        .form-row { display: flex; gap: 10px; }
+        .form-row .form-group { flex-grow: 1; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 8px; font-size: 14px; border-radius: 4px; border: 1px solid #4a4d52; background-color: #23272a; color: #ffffff; box-sizing: border-box; }
+        .folders-section { margin-top: 20px; }
+        .folders-note { font-size: 12px; color: #99aab5; text-align: center; margin-bottom: 10px; }
+        .folder-list { background-color: #23272a; border-radius: 4px; padding: 10px; }
+        .folder-item { display: flex; justify-content: space-between; align-items: center; padding: 5px; font-size: 14px; }
+        .folder-item.custom input { background: transparent; border: none; color: white; flex-grow: 1; }
+        #add-folder-btn { background: none; border: none; color: #7289da; font-size: 20px; cursor: pointer; padding: 0 5px; }
+        .checkbox-group { display: flex; align-items: center; gap: 10px; margin-top: 15px; }
+        .button-group { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+        button { padding: 10px 20px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        #cancel-btn { background-color: #4a4d52; color: white; }
+        #create-btn { background-color: #7289da; color: white; }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>New Chapter Details</h2>
+        <div class="form-row">
+            <div class="form-group" style="flex-basis: 30%;">
+                <label for="chapter-number">Number</label>
+                <input type="number" id="chapter-number" placeholder="e.g., 84">
+            </div>
+            <div class="form-group" style="flex-basis: 70%;">
+                <label for="chapter-name">Name</label>
+                <input type="text" id="chapter-name" placeholder="e.g., House of Dreams">
+            </div>
+        </div>
+
+        <div class="folders-section">
+            <p class="folders-note">Scanstation will create these 5 base folders to ensure correct app functionality.</p>
+            <div id="folder-list-container" class="folder-list">
+            <div class="folder-item"><span>01-Raws</span></div>
+            <div class="folder-item"><span>02-Cleaned</span></div>
+            <div class="folder-item"><span>03-Typeset</span></div>
+            <div class="folder-item"><span>04-Edit-Files</span></div>
+            <div class="folder-item"><span>05-Final</span></div>
+        </div>
+        </div>
+
+        <div class="button-group">
+            <button id="cancel-btn">Cancel</button>
+            <button id="create-btn">Create</button>
+        </div>
+    </div>
+</body>
+</html>
