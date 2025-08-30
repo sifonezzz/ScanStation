@@ -3,7 +3,7 @@
 
 import type { IScanstationAPI, Editor } from './types';
 
-declare const api: IScanstationAPI;
+
 let currentRepoName: string | null = null;
 let originalProjectName: string | null = null;
 let newCoverPath: string | null = null;

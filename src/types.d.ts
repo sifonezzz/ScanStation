@@ -1,5 +1,3 @@
-// REPLACE THE ENTIRE CONTENT of this file with this. This is the single source of truth for your API shape.
-
 export type Editor = 'photoshop' | 'illustrator' | 'gimp';
 
 export interface Project {
@@ -27,28 +25,23 @@ export interface IScanstationAPI {
   saveProofreadData: (data: any) => Promise<{ success: boolean; newStatus: any; error?: string }>;
   markPageCorrect: (data: any) => Promise<{ success: boolean; newStatus: any; error?: string }>;
   openFileInEditor: (data: { editor: Editor; filePath: string }) => Promise<{ success: boolean; error?: string }>;
-
   // Settings Window
   openSettingsWindow: () => void;
   closeSettingsWindow: () => void;
   getEditorPaths: () => Promise<{ [key: string]: string }>;
   selectEditorPath: () => Promise<string | null>;
   setEditorPath: (data: { editor: Editor; path: string }) => void;
-
   // Splash Window
   onStatusUpdate: (callback: (message: string) => void) => void;
-
   // Create Project Window
   createProject: (repoName: string) => void;
   onProjectDataForCreateProject: (callback: (data: { repoName: string }) => void) => void;
   submitProjectCreation: (data: { repoName: string; name: string; path: string }) => void;
   cancelProjectCreation: () => void;
-
   // Edit Project Window
   onProjectDataForEdit: (callback: (data: { name: string; coverPath: string; repoName: string }) => void) => void;
   submitProjectUpdate: (data: any) => Promise<{ success: boolean }>;
   cancelProjectUpdate: () => void;
-
   // Chapter Screen Navigation & Creation
   onProjectDataForChapterScreen: (callback: (data: any) => void) => void;
   getChapters: (repoName: string, projectName: string) => void;
@@ -61,7 +54,6 @@ export interface IScanstationAPI {
   onProjectDataForCreateChapter: (callback: (data: { repoName: string; projectName: string }) => void) => void;
   submitChapterCreation: (data: any) => Promise<{ success: boolean }>;
   cancelChapterCreation: () => void;
-
   // Repo Management & Git
   loadProjects: (repoName: string) => void;
   getRepositories: () => Promise<{ repositories: string[]; selected: string | null }>;
@@ -75,8 +67,14 @@ export interface IScanstationAPI {
   gitPush: (repoName: string) => Promise<any>;
   gitPull: (repoName: string) => Promise<{ success: boolean; message?: string }>;
   gitSyncRepository: (repoName: string) => Promise<{ success: boolean; message?: string }>;
-
   // Universal APIs
   selectCoverImage: () => void;
   onCoverImageSelected: (callback: (path: string) => void) => void;
+}
+
+// This is the new part that fixes the errors
+declare global {
+  interface Window {
+    api: IScanstationAPI;
+  }
 }

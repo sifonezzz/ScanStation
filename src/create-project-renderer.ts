@@ -1,7 +1,6 @@
 
 import type { IScanstationAPI, Editor } from './types';
 
-declare const api: IScanstationAPI;
 
 let selectedCoverPath: string | null = null;
 let currentRepoName: string | null = null;

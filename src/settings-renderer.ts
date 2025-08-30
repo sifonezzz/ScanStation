@@ -1,7 +1,7 @@
 
 import type { IScanstationAPI, Editor } from './types';
 
-declare const api: IScanstationAPI;
+
 
 
 let hasPat = false;

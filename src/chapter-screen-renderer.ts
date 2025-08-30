@@ -1,7 +1,7 @@
 
 import type { IScanstationAPI, Editor } from './types';
 
-declare const api: IScanstationAPI;
+
 
 import translateViewHtml from './translate-view.html';
 import proofreadViewHtml from './proofread-view.html';

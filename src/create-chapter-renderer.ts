@@ -1,7 +1,7 @@
 
 import type { IScanstationAPI, Editor } from './types';
 
-declare const api: IScanstationAPI;
+
 
 let currentRepoName: string | null = null;
 let currentProjectName: string | null = null;
