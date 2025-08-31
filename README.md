@@ -1,5 +1,7 @@
 # Scanstation
 
+![ScanStation Main View](assets/pictures/Main%20View.png)
+
 A collaboration tool for solo and group scanlation projects.
 *This application was built with the extensive support of Gemini.*
 
