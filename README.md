@@ -1,4 +1,4 @@
-# Scanstation
+# ScanStation
 ![SS](assets/pictures/SS.png)
 A collaboration tool for solo and group scanlation projects.
 
@@ -6,7 +6,10 @@ A collaboration tool for solo and group scanlation projects.
 
 ## Features
 - **Project-Based Workflow**: Organize your work into projects, each with its own chapters and cover image.
+
 ![ScanStation Main View](assets/pictures/Main%20View.png)
+
+
 - **Git-Powered Backend**: ScanStation uses GitHub repositories to store and sync your project files allowing for easy collaboration between group members.
 - **Multi-Step Page Tracking**: A sidebar tracks the status of each page through the entire scanlation workflow: Cleaning (CL), Translation (TL), Typesetting (TS), and Proofreading (PR/QC).
 - **Chapter Progress Dashboard**: Get an overview of a chapter's completion status with clear progress bars for each step of the process.
