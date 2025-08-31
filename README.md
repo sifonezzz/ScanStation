@@ -15,6 +15,8 @@ A collaboration tool for solo and group scanlation projects.
     - **Proofread View**: Compare the raw and typeset images directly on a side-by-side view, with a dedicated text box for corrections and annotations. Pages with annotations get circled on the status bar.
     - **Typesetting Helper**: Provides the typesetter with the cleaned page and the final translated text, along with buttons to quickly open the image in an external editor.
 
+---
+
 ## Setup
 
 On your first launch ScanStation will ask you to choose a folder or leave the default one, choose and then
@@ -42,6 +44,7 @@ Every collaborator must connect the app to their GitHub account using a Personal
 3.  Click **Set Token**, paste your token into the input field, and press **Save**.
 4.  Scroll down and click **Done** to close the settings window.
 
+---
 
 ## Setting Up the Repository
 These steps explain how to create a shared GitHub repository and connect it to ScanStation.
@@ -75,6 +78,7 @@ You can now create projects in the repository. Remember that GitHub doesn't trac
 
 * **Desktop Shortcut**: If you wish to create a desktop shortcut, a utility for this is available at the bottom of the **Settings** screen.
 
+---
 
 ## Usage
 
