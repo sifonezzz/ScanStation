@@ -11,7 +11,8 @@ const api: IScanstationAPI = {
 
   // --- Chapter Workspace ---
   openChapterFolder: (chapterPath: string) => ipcRenderer.send('open-chapter-folder', chapterPath),
-  healChapterFolders: (chapterPath: string) => ipcRenderer.invoke('heal-chapter-folders', chapterPath),
+  healChapterFolders: (chapterPath: string) => ipcRenderer.send('heal-chapter-folders', chapterPath),
+  onHealFoldersComplete: (callback) => ipcRenderer.on('heal-folders-complete', (_event, result) => callback(result)),
   getChapterPageStatus: (chapterPath: string) => ipcRenderer.invoke('get-chapter-page-status', chapterPath),
   getFileContent: (filePath: string) => ipcRenderer.invoke('get-file-content', filePath),
   getJsonContent: (filePath: string) => ipcRenderer.invoke('get-json-content', filePath),

@@ -17,7 +17,8 @@ export interface IScanstationAPI {
 
   // Chapter Workspace
   openChapterFolder: (chapterPath: string) => void;
-  healChapterFolders: (chapterPath: string) => Promise<{ success: boolean }>;
+  healChapterFolders: (chapterPath: string) => void;
+  onHealFoldersComplete: (callback: (result: { success: boolean; error?: string }) => void) => void;
   getChapterPageStatus: (chapterPath: string) => Promise<{ success: boolean; pages: any[] }>;
   getFileContent: (filePath: string) => Promise<string>;
   getJsonContent: (filePath: string) => Promise<any>;

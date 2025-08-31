@@ -696,7 +696,7 @@ ipcMain.handle('git-status', async (_, { repoName }) => {
     };
 });
 
-ipcMain.handle('heal-chapter-folders', async (_, chapterPath: string) => {
+ipcMain.on('heal-chapter-folders', async (event, chapterPath: string) => {
     try {
         const requiredFolders = [
             'Raws', 'Raws Cleaned', 'Edit Files', 'Typesetted', 'Final', 'data',
@@ -707,12 +707,17 @@ ipcMain.handle('heal-chapter-folders', async (_, chapterPath: string) => {
         await Promise.all(
             requiredFolders.map(folder => fs.ensureDir(path.join(chapterPath, folder)))
         );
-        
-        return { success: true };
+
+        dialog.showMessageBox({
+            type: 'info',
+            title: 'Success',
+            message: 'Base folders have been checked and recreated if missing.'
+        });
+        event.reply('heal-folders-complete', { success: true });
     } catch (error) {
         console.error('Failed to heal chapter folders:', error);
         dialog.showErrorBox('Healing Failed', `Could not recreate folder structure. Error: ${error.message}`);
-        return { success: false, error: error.message };
+        event.reply('heal-folders-complete', { success: false, error: error.message });
     }
 });
 
@@ -1086,7 +1091,7 @@ const createWindow = (): BrowserWindow => {
     },
   });
 
-  Menu.setApplicationMenu(null);
+  
 
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
   

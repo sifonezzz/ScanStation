@@ -1,7 +1,4 @@
-
 import type { IScanstationAPI, Editor } from './types';
-
-
 
 let currentRepoName: string | null = null;
 let currentProjectName: string | null = null;
@@ -22,12 +19,6 @@ window.addEventListener('DOMContentLoaded', () => {
   const editBtn = document.getElementById('edit-btn');
   projectGrid = document.getElementById('project-grid');
   const repoDropdown = document.getElementById('repo-dropdown') as HTMLSelectElement;
-  editBtn.addEventListener('click', () => {
-    isEditMode = !isEditMode; // Toggle the edit mode state
-    projectGrid.classList.toggle('edit-mode', isEditMode);
-    editBtn.textContent = isEditMode ? 'Done' : 'Edit';
-  });
-  
   const pushRepoBtn = document.getElementById('push-repo-btn');
   const pullRepoBtn = document.getElementById('pull-repo-btn');
   const settingsBtn = document.getElementById('settings-btn');
@@ -37,25 +28,14 @@ window.addEventListener('DOMContentLoaded', () => {
   const chapterGrid = document.getElementById('chapter-grid');
   const createChapterBtn = document.getElementById('create-chapter-btn');
   const backBtn = document.getElementById('back-to-projects-btn');
-  const statusBtn = document.getElementById('git-status-btn');
-  const gitPushBtn = document.getElementById('git-push-btn');
-  const changedFilesDiv = document.getElementById('git-changed-files');
-  const commitMessageInput = document.getElementById('git-commit-message') as HTMLInputElement;
-  const commitBtn = document.getElementById('git-commit-btn');
 
-  // --- Screen Navigation Logic ---
-
-
-  // --- CHAPTER SCREEN LOGIC ---
-  const showGitStatus = (text: string) => {
-    changedFilesDiv.textContent = text;
-  };
-
+  // --- Listen for updates from other windows ---
   window.api.onRepositoriesUpdated(() => {
     console.log('Repositories updated, re-initializing main view...');
-    initialize();
+    initializeProjectView();
   });
 
+  // --- CHAPTER SCREEN LOGIC ---
   window.api.onShowChapterSelection((data) => {
     showChapterSelection(data.repoName, data.projectName);
   });
@@ -70,6 +50,9 @@ window.addEventListener('DOMContentLoaded', () => {
         const card = document.createElement('div');
         card.className = 'chapter-card';
         card.textContent = chapter.name.replace(/_/g, ' ');
+        card.addEventListener('click', () => {
+          window.api.openProject(currentRepoName, currentProjectName, chapter.name);
+        });
         chapterGrid.appendChild(card);
     }
   });
@@ -82,123 +65,22 @@ window.addEventListener('DOMContentLoaded', () => {
 
   settingsBtn.addEventListener('click', () => {
     window.api.openSettingsWindow();
-});
+  });
 
   backBtn.addEventListener('click', (e) => {
     e.preventDefault();
-    const projectScreen = document.getElementById('project-screen');
-    const chapterScreen = document.getElementById('chapter-screen');
-
     if (projectScreen && chapterScreen) {
         chapterScreen.style.display = 'none';
         projectScreen.style.display = 'block';
     }
   });
 
-  statusBtn.addEventListener('click', async () => {
-    if (!currentRepoName) return;
-    showGitStatus('Checking for changes...');
-    try {
-        const status = await window.api.gitStatus(currentRepoName);
-        const changed = status.files.length;
-        if (changed === 0) {
-            showGitStatus('No changes detected.');
-        } else {
-            const fileList = status.files.map((f: { working_dir: string, path: string }) => `${f.working_dir} ${f.path}`).join('\n');
-            showGitStatus(`${changed} file(s) changed:\n${fileList}`);
-        }
-    } catch (error) {
-        showGitStatus(`Error checking status: ${error.message}`);
-    }
-  });
-
-  commitBtn.addEventListener('click', async () => {
-    if (!currentRepoName) return;
-    const message = commitMessageInput.value.trim();
-    if (!message) {
-        alert('Please enter a commit message.');
-        return;
-    }
-    showGitStatus('Committing...');
-    try {
-        await window.api.gitCommit(currentRepoName, message);
-        commitMessageInput.value = '';
-        showGitStatus('Commit successful! Ready to push.');
-        await statusBtn.click(); // Refresh status
-    } catch (error) {
-        showGitStatus(`Error committing: ${error.message}`);
-    }
-  });
-
-  gitPushBtn.addEventListener('click', async () => {
-    if (!currentRepoName) return;
-    showGitStatus('Pushing changes to GitHub...');
-    try {
-        await window.api.gitPush(currentRepoName);
-        showGitStatus('Push successful! Your repository is up to date.');
-    } catch (error) {
-        showGitStatus(`Error pushing: ${error.message}\nMake sure you are a collaborator and have set a valid Personal Access Token.`);
-    }
-  });
-
-
   // --- PROJECT SCREEN LOGIC ---
-  async function initialize() {
-    const identity = await window.api.getGitIdentity();
-    if (!identity.name || !identity.email) {
-        const modal = document.getElementById('git-identity-modal');
-        const nameInput = document.getElementById('git-name-input') as HTMLInputElement;
-        const emailInput = document.getElementById('git-email-input') as HTMLInputElement;
-        const saveBtn = document.getElementById('git-identity-save-btn');
-        
-        nameInput.value = identity.name || '';
-        emailInput.value = identity.email || '';
-        modal.style.display = 'flex';
-
-        saveBtn.addEventListener('click', async () => {
-            const name = nameInput.value.trim();
-            const email = emailInput.value.trim();
-            if (name && email) {
-                const result = await window.api.setGitIdentity({ name, email });
-                if (result.success) {
-                    modal.style.display = 'none';
-                } else {
-                    alert(`Failed to set Git identity: ${result.error}`);
-                }
-            } else {
-                alert('Please enter both your username and email.');
-            }
-        });
-        return; // Stop initialization until identity is set
-    }
-    const { repositories, selected } = await window.api.getRepositories();
-    currentRepositories = repositories;
-    selectedRepository = selected;
-    updateRepoDropdown();
-    if (selectedRepository) {
-        window.api.loadProjects(selectedRepository);
-    } else {
-        projectGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">Please add a repository and select it to get started!</p>`;
-    }
-}
-
-
-  function updateRepoDropdown() {
-    repoDropdown.innerHTML = '';
-    if (currentRepositories.length === 0) {
-        const option = document.createElement('option');
-        option.textContent = 'No repositories added';
-        repoDropdown.appendChild(option);
-        return;
-    }
-    for (const repo of currentRepositories) {
-        const option = document.createElement('option');
-        option.value = repo;
-        option.textContent = repo;
-        repoDropdown.appendChild(option);
-    }
-    repoDropdown.value = selectedRepository;
-  }
+  editBtn.addEventListener('click', () => {
+    isEditMode = !isEditMode;
+    projectGrid.classList.toggle('edit-mode', isEditMode);
+    editBtn.textContent = isEditMode ? 'Done' : 'Edit';
+  });
 
   createProjectBtn.addEventListener('click', () => {
     if (!selectedRepository) {
@@ -207,8 +89,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     window.api.createProject(selectedRepository);
   });
-
-  
 
   pushRepoBtn.addEventListener('click', async () => {
     if (!selectedRepository) {
@@ -223,12 +103,12 @@ window.addEventListener('DOMContentLoaded', () => {
         alert(result.message);
     } catch (error) {
         alert(`Failed to sync repository: ${error.message}`);
-    } finally {
+     } finally {
         pushRepoBtn.textContent = originalText;
         pushRepoBtn.removeAttribute('disabled');
     }
   });
-  
+
   pullRepoBtn.addEventListener('click', async () => {
     if (!selectedRepository) {
         alert('Please select a repository to pull from.');
@@ -242,23 +122,18 @@ window.addEventListener('DOMContentLoaded', () => {
         alert(result.message);
         window.api.loadProjects(selectedRepository);
     } catch (error) {
-        alert(`Failed to pull repository: ${error.message}`);
+         alert(`Failed to pull repository: ${error.message}`);
     } finally {
         pullRepoBtn.textContent = originalText;
         pullRepoBtn.removeAttribute('disabled');
     }
   });
 
-  
- 
-
   repoDropdown.addEventListener('change', () => {
     const newRepo = repoDropdown.value;
     selectedRepository = newRepo;
     window.api.setSelectedRepository(newRepo);
   });
-
-  
 
   window.api.onProjectsLoaded((projects) => {
     projectGrid.innerHTML = '';
@@ -287,7 +162,6 @@ window.addEventListener('DOMContentLoaded', () => {
       
       const overlay = document.createElement('div');
       overlay.className = 'project-card-overlay';
-      
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'project-action-btn delete-btn';
       deleteBtn.textContent = '-';
@@ -295,7 +169,6 @@ window.addEventListener('DOMContentLoaded', () => {
         e.stopPropagation();
         await window.api.deleteProject(selectedRepository, project.name);
       });
-
       const editProjectBtn = document.createElement('button');
       editProjectBtn.className = 'project-action-btn edit-project-btn';
       editProjectBtn.textContent = 'Edit';
@@ -303,25 +176,87 @@ window.addEventListener('DOMContentLoaded', () => {
         e.stopPropagation();
         window.api.openEditProjectWindow(selectedRepository, project.name);
       });
-
       overlay.appendChild(deleteBtn);
       overlay.appendChild(editProjectBtn);
       card.appendChild(title);
       card.appendChild(overlay);
 
-      // MODIFIED CLICK EVENT
       card.addEventListener('click', () => {
         if (!isEditMode) {
-          // Instead of opening the project directly, show the chapter list
           showChapterSelection(selectedRepository, project.name);
         }
       });
       projectGrid.appendChild(card);
     }
+  });
+
+  // --- Initial Load ---
+  initializeProjectView();
+  checkAndSetGitIdentity();
 });
 
-  initialize();
-});
+async function checkAndSetGitIdentity() {
+    const identity = await window.api.getGitIdentity();
+    if (identity.name && identity.email) {
+        return; // Identity is already set, do nothing.
+    }
+
+    const modal = document.getElementById('git-identity-modal');
+    const nameInput = document.getElementById('git-name-input') as HTMLInputElement;
+    const emailInput = document.getElementById('git-email-input') as HTMLInputElement;
+    const saveBtn = document.getElementById('git-identity-save-btn');
+    
+    nameInput.value = identity.name || '';
+    emailInput.value = identity.email || '';
+    modal.style.display = 'flex';
+
+    saveBtn.addEventListener('click', async () => {
+        const name = nameInput.value.trim();
+        const email = emailInput.value.trim();
+        if (name && email) {
+            const result = await window.api.setGitIdentity({ name, email });
+            if (result.success) {
+                modal.style.display = 'none';
+                initializeProjectView(); // Reload projects after setting identity
+            } else {
+                alert(`Failed to set Git identity: ${result.error}`);
+            }
+        } else {
+            alert('Please enter both your username and email.');
+        }
+    });
+}
+
+async function initializeProjectView() {
+    const { repositories, selected } = await window.api.getRepositories();
+    currentRepositories = repositories;
+    selectedRepository = selected;
+    updateRepoDropdown();
+    if (selectedRepository) {
+        window.api.loadProjects(selectedRepository);
+    } else {
+        projectGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">Please add a repository and select it to get started!</p>`;
+    }
+}
+
+function updateRepoDropdown() {
+    const repoDropdown = document.getElementById('repo-dropdown') as HTMLSelectElement;
+    if (!repoDropdown) return; // Add a guard clause in case element is not found
+    repoDropdown.innerHTML = '';
+    if (currentRepositories.length === 0) {
+        const option = document.createElement('option');
+        option.textContent = 'No repositories added';
+        repoDropdown.appendChild(option);
+        return;
+    }
+    for (const repo of currentRepositories) {
+        const option = document.createElement('option');
+        option.value = repo;
+        option.textContent = repo;
+        repoDropdown.appendChild(option);
+    }
+    repoDropdown.value = selectedRepository;
+}
 
 function showChapterSelection(repoName: string, projectName: string) {
   // Store the current project context
@@ -344,34 +279,15 @@ function showChapterSelection(repoName: string, projectName: string) {
 
   // 1. Hide the project screen and show the chapter screen
   projectScreen.style.display = 'none';
-  chapterScreen.style.display = 'block'; // Use 'block' or 'flex' as appropriate
+  chapterScreen.style.display = 'block';
 
   // 2. Set the header title
   projectNameHeader.textContent = projectName;
-
+  
   // 3. Clear the grid and show a loading message
   chapterGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">Loading chapters...</p>`;
-
-  // 4. Listen for the chapter data and render it
-  window.api.onChaptersLoaded((chapters) => {
-    chapterGrid.innerHTML = ''; // Clear loading message
-    if (chapters.length === 0) {
-      chapterGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">No chapters found. Click '+ New Chapter' to get started!</p>`;
-    } else {
-      for (const chapter of chapters) {
-        const card = document.createElement('div');
-        card.className = 'chapter-card';
-        card.textContent = chapter.name.replace(/_/g, ' ');
-        // When a chapter is clicked, navigate the main window to the workspace view
-        card.addEventListener('click', () => {
-          window.api.openProject(repoName, projectName, chapter.name);
-        });
-        chapterGrid.appendChild(card);
-      }
-    }
-  });
-
-  // 5. Request the chapters for the selected project
+  
+  // 4. Request the chapters for the selected project
   window.api.getChapters(repoName, projectName);
 }
 export {};

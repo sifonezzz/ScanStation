@@ -21,6 +21,7 @@ let activeView: {
   onKeydown?: (e: KeyboardEvent) => void;
 } = { name: 'none', saveData: async () => {} };
 let projectNameHeader: HTMLElement, backBtn: HTMLElement, openFolderBtn: HTMLElement, healFoldersBtn: HTMLElement, homeBtn: HTMLElement, translateBtn: HTMLElement, proofreadBtn: HTMLElement, typesetBtn: HTMLElement, galleryViewContainer: HTMLElement, workspacePlaceholder: HTMLElement, pageListDiv: HTMLElement;
+let notificationBar: HTMLElement;
 // --- Main Setup ---
 window.addEventListener('DOMContentLoaded', () => {
   projectNameHeader = document.getElementById('project-name-header');
@@ -44,16 +45,20 @@ window.addEventListener('DOMContentLoaded', () => {
     showHomeView(); // Show dashboard on load
   });
 
-  healFoldersBtn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      if (currentChapterPath) {
-          const result = await window.api.healChapterFolders(currentChapterPath);
-          if (result.success) {
-              alert('Base folders have been checked and recreated if missing. Refreshing page list.');
-              await loadAndRenderPageStatus(); // Reload the sidebar
-          }
-      }
+    window.api.onHealFoldersComplete(async (result) => {
+        if (result.success) {
+            console.log('Folders healed. Refreshing page list.');
+            await loadAndRenderPageStatus(); // Reload the sidebar
+        }
     });
+  
+  healFoldersBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (currentChapterPath) {
+        // We no longer await this, as the reply will trigger the refresh
+        window.api.healChapterFolders(currentChapterPath);
+    }
+  });
 
   backBtn.addEventListener('click', (e) => { e.preventDefault(); window.api.goBackToProjects(currentRepoName, currentProjectName); });
   openFolderBtn.addEventListener('click', (e) => { e.preventDefault(); if (currentChapterPath) window.api.openChapterFolder(currentChapterPath); });
@@ -88,6 +93,16 @@ async function loadAndRenderPageStatus() {
   if (!currentChapterPath) return;
   const result = await window.api.getChapterPageStatus(currentChapterPath);
   if (result.success) { pages = result.pages; renderSidebar(); }
+}
+
+function showNotification(message: string, duration = 3000) {
+    if (!notificationBar) return;
+    notificationBar.textContent = message;
+    notificationBar.style.top = '0px'; // Slide it down
+
+    setTimeout(() => {
+        notificationBar.style.top = '-50px'; // Slide it back up
+    }, duration);
 }
 
 function renderSidebar() {
@@ -366,7 +381,21 @@ function initProofreadView(startingIndex: number) {
 
 function initTypesetView(startingIndex: number) {
   let currentPageIndex = startingIndex;
-  let currentImageType: 'cleaned' | 'raw' = 'cleaned'; // Default to cleaned
+  let currentImageType: 'cleaned' | 'raw' = 'cleaned';
+
+  const pageIndicator = document.getElementById('typeset-page-indicator') as HTMLSpanElement;
+  const mainImage = document.getElementById('typeset-image') as HTMLImageElement;
+  const translationTextDiv = document.getElementById('typeset-translation-text') as HTMLDivElement;
+  const nextBtn = document.getElementById('typeset-next-btn') as HTMLButtonElement;
+  const prevBtn = document.getElementById('typeset-prev-btn') as HTMLButtonElement;
+  const closeBtn = document.querySelector('.gallery-close-btn') as HTMLAnchorElement;
+  const showCleanedBtn = document.getElementById('show-cleaned-btn') as HTMLButtonElement;
+  const showRawBtn = document.getElementById('show-raw-btn') as HTMLButtonElement;
+  
+  // ▼▼▼ ADDED a canvas and its context here ▼▼▼
+  const drawingCanvas = document.getElementById('typeset-drawing-canvas') as HTMLCanvasElement;
+  const ctx = drawingCanvas.getContext('2d');
+
   activeView = {
     name: 'typeset',
     saveData: async () => {},
@@ -379,31 +408,62 @@ function initTypesetView(startingIndex: number) {
     },
   };
 
-  const pageIndicator = document.getElementById('typeset-page-indicator') as HTMLSpanElement;
-  const mainImage = document.getElementById('typeset-image') as HTMLImageElement;
-  const translationTextDiv = document.getElementById('typeset-translation-text') as HTMLDivElement;
-  const nextBtn = document.getElementById('typeset-next-btn') as HTMLButtonElement;
-  const prevBtn = document.getElementById('typeset-prev-btn') as HTMLButtonElement;
-  const closeBtn = document.querySelector('.gallery-close-btn') as HTMLAnchorElement;
-  const showCleanedBtn = document.getElementById('show-cleaned-btn') as HTMLButtonElement;
-  const showRawBtn = document.getElementById('show-raw-btn') as HTMLButtonElement;
+  // ▼▼▼ ADDED this function to draw on the canvas ▼▼▼
+  const redrawTypesetCanvas = (drawingData: DrawingData) => {
+    if (!mainImage.clientWidth || !mainImage.clientHeight || !drawingData || !drawingData.lines) {
+      ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height); // Clear if no data
+      return;
+    }
+    const imgRect = mainImage.getBoundingClientRect();
+    const parentRect = mainImage.parentElement.getBoundingClientRect();
 
-  const updateImageView = () => {
+    drawingCanvas.style.top = `${imgRect.top - parentRect.top}px`;
+    drawingCanvas.style.left = `${imgRect.left - parentRect.left}px`;
+    drawingCanvas.width = imgRect.width;
+    drawingCanvas.height = imgRect.height;
+    
+    ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+    ctx.strokeStyle = 'red';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    drawingData.lines.forEach(line => {
+      if (line.points.length < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(line.points[0].x * drawingCanvas.width, line.points[0].y * drawingCanvas.height);
+      for (let i = 1; i < line.points.length; i++) {
+        ctx.lineTo(line.points[i].x * drawingCanvas.width, line.points[i].y * drawingCanvas.height);
+      }
+      ctx.stroke();
+    });
+  };
+  
+  const updateImageView = async () => {
     const page = pages[currentPageIndex];
     if (!page) return;
 
-    if (currentImageType === 'cleaned') {
-      const cleanedPath = `${currentChapterPath}/Raws Cleaned/${page.fileName}`.replace(/\\/g, '/');
-      mainImage.src = `scanstation-asset:///${cleanedPath}`;
-      showCleanedBtn.classList.add('active');
-      showRawBtn.classList.remove('active');
-    } else { // raw
-      const rawPath = `${currentChapterPath}/Raws/${page.fileName}`.replace(/\\/g, '/');
-      mainImage.src = `scanstation-asset:///${rawPath}`;
-      showRawBtn.classList.add('active');
-      showCleanedBtn.classList.remove('active');
-    }
+    const imagePath = currentImageType === 'cleaned' 
+      ? `${currentChapterPath}/Raws Cleaned/${page.fileName}` 
+      : `${currentChapterPath}/Raws/${page.fileName}`;
+    
+    mainImage.src = `scanstation-asset:///${imagePath.replace(/\\/g, '/')}`;
+    showCleanedBtn.classList.toggle('active', currentImageType === 'cleaned');
+    showRawBtn.classList.toggle('active', currentImageType !== 'cleaned');
+    
     mainImage.onerror = () => { mainImage.src = ''; };
+
+    // ▼▼▼ MODIFIED to load drawing data here ▼▼▼
+    const drawingData = await window.api.getJsonContent(`${currentChapterPath}/data/TL Data/${page.fileName}_drawing.json`);
+    
+    // Ensure canvas redraws after image loads
+    if (mainImage.complete) {
+        redrawTypesetCanvas(drawingData);
+    } else {
+        mainImage.onload = () => redrawTypesetCanvas(drawingData);
+    }
+    // Also attach a resize listener
+    window.addEventListener('resize', () => redrawTypesetCanvas(drawingData));
   };
 
   const loadPage = async (index: number) => {
@@ -412,7 +472,7 @@ function initTypesetView(startingIndex: number) {
     const page = pages[currentPageIndex];
     pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
     
-    updateImageView(); // This will set the image source
+    await updateImageView();
 
     const translatedText = await window.api.getFileContent(`${currentChapterPath}/data/TL Data/${page.fileName}.txt`);
     translationTextDiv.textContent = translatedText || 'No translation text found for this page.';
