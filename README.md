@@ -26,42 +26,7 @@ A collaboration tool for solo and group scanlation projects.
 
 Since ScanStation works directly with github backend, it needs git installed to work, and you also need to set your git identity. If you already have git installed on your computer, then you can skip this.
 
-You will first need to install Chocolatey package manager:
-
-1.  Open **PowerShell as administrator**.
-2.  Copy and run the following command:
-
-    ```powershell
-    Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('[https://community.chocolatey.org/install.ps1](https://community.chocolatey.org/install.ps1)'))
-    ```
-
-### 2. Install Git
-
-1.  After Chocolatey is installed, close and reopen **PowerShell as administrator**.
-2.  Run the following command to install Git:
-
-    ```powershell
-    choco install git -y
-    ```
-
-### 3. Setting Your Git Identity
-
-1.  Open your Powershell or the Command Prompt.
-
-2.  Run the following two commands, **replacing the placeholder text** with your own GitHub username and the email address associated with your GitHub account.
-
-    ```bash
-    git config --global user.name "YourGitHubUsername"
-    git config --global user.email "your_email@example.com"
-    ```
-
-    *The `--global` flag will save this information for every Git repository on your computer.*
-
-### How to Verify
-
-To check that your information was saved correctly, run the following command:
-
-```git config --list```
+The program will prompt you to install git and set your identity on the first launch if needed.
 
 After this is done, ScanStation will work properly.
 
@@ -129,7 +94,6 @@ These steps explain how to create a shared GitHub repository and connect it to S
 
 
 ### For Everyone (Owner & Collaborators)
-
 
 
 1.  **Copy the Repository URL**

@@ -71,6 +71,9 @@ export interface IScanstationAPI {
   gitSyncRepository: (repoName: string) => Promise<{ success: boolean; message?: string }>;
   // Universal APIs
   selectCoverImage: () => void;
+  openExternalLink: (url: string) => void;
+  getGitIdentity: () => Promise<{ name: string; email: string }>;
+  setGitIdentity: (data: { name: string; email: string; }) => Promise<{ success: boolean; error?: string }>;
   onCoverImageSelected: (callback: (path: string) => void) => void;
   createDesktopShortcut: () => Promise<{ success: boolean; error?: string }>;
 }

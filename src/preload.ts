@@ -73,6 +73,9 @@ const api: IScanstationAPI = {
 
   // --- Universal APIs ---
   selectCoverImage: () => ipcRenderer.send('select-cover-image'),
+  getGitIdentity: () => ipcRenderer.invoke('get-git-identity'),
+  setGitIdentity: (data) => ipcRenderer.invoke('set-git-identity', data),
+  openExternalLink: (url: string) => ipcRenderer.send('open-external-link', url),
   onCoverImageSelected: (callback: (path: string) => void) => ipcRenderer.on('cover-image-selected', (_event, path) => callback(path)),
 };
 

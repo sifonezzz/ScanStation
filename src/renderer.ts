@@ -144,6 +144,33 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // --- PROJECT SCREEN LOGIC ---
   async function initialize() {
+    const identity = await window.api.getGitIdentity();
+    if (!identity.name || !identity.email) {
+        const modal = document.getElementById('git-identity-modal');
+        const nameInput = document.getElementById('git-name-input') as HTMLInputElement;
+        const emailInput = document.getElementById('git-email-input') as HTMLInputElement;
+        const saveBtn = document.getElementById('git-identity-save-btn');
+        
+        nameInput.value = identity.name || '';
+        emailInput.value = identity.email || '';
+        modal.style.display = 'flex';
+
+        saveBtn.addEventListener('click', async () => {
+            const name = nameInput.value.trim();
+            const email = emailInput.value.trim();
+            if (name && email) {
+                const result = await window.api.setGitIdentity({ name, email });
+                if (result.success) {
+                    modal.style.display = 'none';
+                } else {
+                    alert(`Failed to set Git identity: ${result.error}`);
+                }
+            } else {
+                alert('Please enter both your username and email.');
+            }
+        });
+        return; // Stop initialization until identity is set
+    }
     const { repositories, selected } = await window.api.getRepositories();
     currentRepositories = repositories;
     selectedRepository = selected;

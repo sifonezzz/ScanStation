@@ -6,7 +6,7 @@ import fs from 'fs-extra';
 import simpleGit, { SimpleGit } from 'simple-git';
 import Jimp from 'jimp';
 import { getSetting, setSetting, deleteSetting } from './settings';
-import { execFile } from 'child_process';
+import { exec, execFile } from 'child_process';
 
 // Declare the entry points for Webpack.
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
@@ -23,6 +23,8 @@ declare const SPLASH_WINDOW_WEBPACK_ENTRY: string;
 declare const SPLASH_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 declare const SETTINGS_WINDOW_WEBPACK_ENTRY: string;
 declare const SETTINGS_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
+declare const WELCOME_WINDOW_WEBPACK_ENTRY: string;
+declare const WELCOME_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 
 let createProjectWindow: BrowserWindow | null = null;
@@ -32,6 +34,7 @@ let createChapterWindow: BrowserWindow | null = null;
 let lastWindowBounds: Electron.Rectangle = { width: 1024, height: 768, x: undefined, y: undefined };
 let splashWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
+let welcomeWindow: BrowserWindow | null = null;
 
 
 function getRepoNameFromUrl(url: string): string | null {
@@ -112,6 +115,34 @@ ipcMain.handle('select-editor-path', async () => {
 ipcMain.handle('set-editor-path', (_, { editor, path }: { editor: string, path: string }) => {
     const key = `${editor}Path` as keyof AppStore;
     setSetting(key, path);
+});
+
+ipcMain.handle('get-git-identity', (): Promise<{ name: string; email: string }> => {
+    return new Promise((resolve) => {
+        let name = '';
+        let email = '';
+        exec('git config user.name', (err, stdout) => {
+            if (!err) name = stdout.trim();
+            exec('git config user.email', (err, stdout) => {
+                if (!err) email = stdout.trim();
+                resolve({ name, email });
+            });
+        });
+    });
+});
+
+ipcMain.handle('set-git-identity', async (_, { name, email }: { name: string; email: string }) => {
+    try {
+        await new Promise<void>((resolve, reject) => {
+            exec(`git config --global user.name "${name}"`, (err) => (err ? reject(err) : resolve()));
+        });
+        await new Promise<void>((resolve, reject) => {
+            exec(`git config --global user.email "${email}"`, (err) => (err ? reject(err) : resolve()));
+        });
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
 });
 
 ipcMain.handle('create-shortcut', async () => {
@@ -288,6 +319,9 @@ async function performAuthenticatedPush(git: SimpleGit) {
 
 
 // --- IPC Handlers ---
+ipcMain.on('open-external-link', (_, url: string) => {
+    shell.openExternal(url);
+});
 
 ipcMain.on('open-create-project-window', (_, repoName) => openCreateProjectWindow(repoName));
 ipcMain.on('select-cover-image', async (event) => {
@@ -927,6 +961,31 @@ ipcMain.handle('mark-page-correct', async (_, { chapterPath, pageFile }) => {
     }
 });
 
+function checkGitInstallation(): Promise<boolean> {
+    return new Promise((resolve) => {
+        exec('git --version', (error) => {
+            if (error) {
+                resolve(false); // Git is not found
+            } else {
+                resolve(true); // Git is found
+            }
+        });
+    });
+}
+
+function createWelcomeWindow() {
+    welcomeWindow = new BrowserWindow({
+        width: 600,
+        height: 300,
+        resizable: false,
+        backgroundColor: '#2c2f33',
+        webPreferences: {
+            preload: WELCOME_WINDOW_PRELOAD_WEBPACK_ENTRY,
+        },
+    });
+    welcomeWindow.loadURL(WELCOME_WINDOW_WEBPACK_ENTRY);
+}
+
 function getStoragePath(): string {
   const customPath = getSetting<string>('projectStoragePath');
   const basePath = customPath || path.join(app.getPath('userData'), 'Scanstation');
@@ -1055,6 +1114,7 @@ app.whenReady().then(async () => {
       const url = new URL(request.url);
       let decodedPath = decodeURI(url.pathname);
        if (process.platform === 'win32' && decodedPath.startsWith('/')) {
+        
         decodedPath = decodedPath.substring(1);
       }
       callback({ path: path.normalize(decodedPath) });
@@ -1064,30 +1124,34 @@ app.whenReady().then(async () => {
     }
   });
 
-  createSplashWindow();
+  const isGitInstalled = await checkGitInstallation();
 
-  await handleFirstBoot();
+  if (!isGitInstalled) {
+      createWelcomeWindow();
+  } else {
+      createSplashWindow();
+      await handleFirstBoot();
+      updateSplashStatus('Backing up current user folder...');
+      await backupProjects();
+      updateSplashStatus('Done!');
+      const mainWindow = createWindow();
+      setTimeout(() => {
+          if (splashWindow && !splashWindow.isDestroyed()) {
+              splashWindow.close();
+          }
+          mainWindow.show();
+      }, 1200);
+  }
 
-  updateSplashStatus('Backing up current user folder...');
-  await backupProjects();
-
-  // updateSplashStatus('Pulling changes from repositories...');
-  // await updateAllRepositories();
-
-  updateSplashStatus('Done!');
-  const mainWindow = createWindow();
-  
-  setTimeout(() => {
-    if (splashWindow && !splashWindow.isDestroyed()) {
-        splashWindow.close();
-    }
-    mainWindow.show();
-  }, 1200); // A short delay to show "Done!"
-
-  app.on('activate', () => {
+  app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      const mw = createWindow();
-      mw.show();
+        const gitInstalled = await checkGitInstallation();
+        if (gitInstalled) {
+            const mw = createWindow();
+            mw.show();
+        } else {
+            createWelcomeWindow();
+        }
     }
   });
 });

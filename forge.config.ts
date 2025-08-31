@@ -82,6 +82,14 @@ const config: ForgeConfig = {
             },
           },
           {
+            html: './src/welcome.html',
+            js: './src/welcome-renderer.ts',
+            name: 'welcome_window',
+            preload: {
+              js: './src/preload.ts',
+            },
+          },
+          {
             html: './src/create-chapter.html',
             js: './src/create-chapter-renderer.ts',
             name: 'create_chapter_window',
