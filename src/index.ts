@@ -1,6 +1,6 @@
 import { AppStore } from './settings';
 
-import { app, BrowserWindow, ipcMain, dialog, protocol, session, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, protocol, session, shell, Menu } from 'electron';
 import path from 'path';
 import fs from 'fs-extra';
 import simpleGit, { SimpleGit } from 'simple-git';
@@ -113,8 +113,6 @@ ipcMain.handle('set-editor-path', (_, { editor, path }: { editor: string, path: 
     const key = `${editor}Path` as keyof AppStore;
     setSetting(key, path);
 });
-
-// src/index.ts
 
 ipcMain.handle('create-shortcut', async () => {
     try {
@@ -1028,6 +1026,8 @@ const createWindow = (): BrowserWindow => {
       nodeIntegration: false,
     },
   });
+
+  Menu.setApplicationMenu(null);
 
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
   
