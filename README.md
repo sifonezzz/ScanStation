@@ -1,6 +1,7 @@
 # Scanstation
 ![SS](assets/pictures/SS.png)
 A collaboration tool for solo and group scanlation projects.
+
 *This application was built with the extensive support of Gemini.*
 
 ## Features
@@ -14,10 +15,9 @@ A collaboration tool for solo and group scanlation projects.
     - **Proofread View**: Compare the raw and typeset images directly on a side-by-side view, with a dedicated text box for corrections and annotations. Pages with annotations get circled on the status bar.
     - **Typesetting Helper**: Provides the typesetter with the cleaned page and the final translated text, along with buttons to quickly open the image in an external editor.
 
----
 ## Setup
 
-On your fisrt launch ScanStation will ask you to choose a folder or leave the default one, choose and then
+On your first launch ScanStation will ask you to choose a folder or leave the default one, choose and then
 wait for the green window to dissappear to complete installation.
 
 ### Connecting to GitHub
@@ -42,12 +42,10 @@ Every collaborator must connect the app to their GitHub account using a Personal
 3.  Click **Set Token**, paste your token into the input field, and press **Save**.
 4.  Scroll down and click **Done** to close the settings window.
 
----
 
 ## Setting Up the Repository
 These steps explain how to create a shared GitHub repository and connect it to ScanStation.
 
----
 ### For the Repository Owner
 
 1.  **Create the Repository**
@@ -59,12 +57,12 @@ These steps explain how to create a shared GitHub repository and connect it to S
 3.  **Invite Collaborators**
     Navigate to your repository's **Settings** tab. In the sidebar, click **Collaborators**. Click **Add people** and invite your team members using their GitHub usernames.  You can also add collaborators directly from the quick setup page.
 
----
+
 ### For Collaborators
 
 * **Accept the Invitation**: You will receive an invitation via email and in your GitHub notifications. Click the link in the invitation to accept. You can see the invitation on your notifications tab from Github.
 
----
+
 ### For Everyone (Owner & Collaborators)
 
 1.  **Copy the Repository URL**
@@ -77,21 +75,9 @@ You can now create projects in the repository. Remember that GitHub doesn't trac
 
 * **Desktop Shortcut**: If you wish to create a desktop shortcut, a utility for this is available at the bottom of the **Settings** screen.
 
----
 
 ## Usage
 
-
-
-
-
-
-### Step 5: The Scanlation Workflow
-Once you click on a chapter, you enter the workspace.
-- The **sidebar** on the right shows the status of every page. The `CL` and `TS` statuses update automatically when you place the corresponding files in the `Raws Cleaned` and `Typesetted` folders.
-- Use the **Translate**, **Proofread**, and **Typeset** buttons at the top to enter the different workflow modes.
-- Your work in the Translate and Proofread views is **saved automatically** when you navigate between pages or switch views.
-- Once a page is finished, use the **"Page is Correct"** button in the Proofread view to copy the typeset file to the `Final` folder, ready for release.
 
 ---
 ## Disclaimer
