@@ -5,6 +5,8 @@ A collaboration tool for solo and group scanlation projects.
 *This application was built with the extensive support of Gemini.*
 
 ## Features
+
+
 - **Project-Based Workflow**: Organize your work into projects, each with its own chapters and cover image.
 
 ![ScanStation Main View](assets/pictures/Main%20View.png)
@@ -20,16 +22,67 @@ A collaboration tool for solo and group scanlation projects.
 
 ---
 
+## Requirements
+
+Since ScanStation works directly with github backend, it needs git installed to work, and you also need to set your git identity. If you already have git installed on your computer, then you can skip this.
+
+You will first need to install Chocolatey package manager:
+
+1.  Open **PowerShell as administrator**.
+2.  Copy and run the following command:
+
+    ```powershell
+    Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('[https://community.chocolatey.org/install.ps1](https://community.chocolatey.org/install.ps1)'))
+    ```
+
+### 2. Install Git
+
+1.  After Chocolatey is installed, close and reopen **PowerShell as administrator**.
+2.  Run the following command to install Git:
+
+    ```powershell
+    choco install git -y
+    ```
+
+### 3. Setting Your Git Identity
+
+1.  Open your Powershell or the Command Prompt.
+
+2.  Run the following two commands, **replacing the placeholder text** with your own GitHub username and the email address associated with your GitHub account.
+
+    ```bash
+    git config --global user.name "YourGitHubUsername"
+    git config --global user.email "your_email@example.com"
+    ```
+
+    *The `--global` flag will save this information for every Git repository on your computer.*
+
+### How to Verify
+
+To check that your information was saved correctly, run the following command:
+
+```git config --list```
+
+After this is done, ScanStation will work properly.
+
+---
+
 ## Setup
+
+
 
 On your first launch ScanStation will ask you to choose a folder or leave the default one, choose and then
 wait for the green window to dissappear to complete installation.
 
 ### Connecting to GitHub
 
+
+
 Every collaborator must connect the app to their GitHub account using a Personal Access Token (PAT). While you can use your main GitHub account, I recommend creating a separate account dedicated to scanlations.
 
 ### Creating the Personal Access Token
+
+
 
 1.  On the GitHub website, click your **profile picture** in the top-right corner, then select **Settings**.
 2.  In the left sidebar, scroll down and click **Developer settings**.
@@ -42,6 +95,8 @@ Every collaborator must connect the app to their GitHub account using a Personal
 
 ### Adding the Token to Scanstation
 
+
+
 1.  **Copy the newly generated token**. Be sure to save it somewhere safe, as you won't be able to see it again. In the case you lose the token, you will have to regenerate it.
 2.  Open **Scanstation** and go to the **Settings** screen.
 3.  Click **Set Token**, paste your token into the input field, and press **Save**.
@@ -51,6 +106,8 @@ Every collaborator must connect the app to their GitHub account using a Personal
 
 ## Setting Up the Repository
 These steps explain how to create a shared GitHub repository and connect it to ScanStation.
+
+
 
 ### For the Repository Owner
 
@@ -66,10 +123,14 @@ These steps explain how to create a shared GitHub repository and connect it to S
 
 ### For Collaborators
 
+
+
 * **Accept the Invitation**: You will receive an invitation via email and in your GitHub notifications. Click the link in the invitation to accept. You can see the invitation on your notifications tab from Github.
 
 
 ### For Everyone (Owner & Collaborators)
+
+
 
 1.  **Copy the Repository URL**
     Navigate to the main page of the repository on GitHub. Click the green **<> Code** button and copy the **HTTPS** URL. It will look like this: `https://github.com/YourUsername/YourRepo.git`.
