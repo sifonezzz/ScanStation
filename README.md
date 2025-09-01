@@ -19,7 +19,7 @@ After this is done, ScanStation will work properly.
 
 
 On your first launch ScanStation will ask you to choose a folder or leave the default one, choose and then
-wait for the green window to dissappear to complete installation.
+wait for the initial loading screen (green window) to close to complete the installation.
 
 ### Connecting to GitHub
 
@@ -92,6 +92,49 @@ You can now create projects in the repository. Remember that GitHub doesn't trac
 
 ## Usage
 
+1. Create a Project
+All your work is organized into projects.
+
+From the main screen, ensure the correct repository is selected in the dropdown menu.
+
+Click + New Project.
+
+Give your project a name and image.
+
+2. Create a Chapter
+Once you click on a project, you can add chapters to it.
+
+From the project's chapter list, click + New Chapter.
+
+Enter the chapter number and name.
+
+ScanStation will automatically create the necessary folders inside your project's directory.
+
+3. The Scanlation Workflow
+This is the main workspace for editing and tracking page progress.
+
+Add Raw Images: Place your raw manga pages into the Raws folder for the chapter you are working on. The sidebar will automatically populate with these pages.
+
+Use the Views:
+
+Click the Translate button to open the translation view. Here, you can write the script and draw on the image to mark bubbles. Your work is saved automatically.
+
+Once pages are cleaned and placed in the Raws Cleaned folder, click the Typeset button. This view shows the cleaned page and the translated text, with buttons to open the image in an external editor like Photoshop.
+
+After a page is typeset and placed in the Typesetted folder, click the Proofread button. This view shows a side-by-side comparison of the raw and typeset images for final checks. You can write corrections in the annotations box.
+
+Track Progress: The sidebar on the right shows the status of every page (CL, TL, TS, PR, QC). The CL (Cleaned) and TS (Typeset) statuses update automatically when you add files to the corresponding folders.
+
+Finalize a Page: In the Proofread view, clicking the "Page is Correct" button will copy the typeset file to the Final folder, ready for release.
+
+4. Push Your Work
+To share your progress and make your files available to collaborators, you must push your changes to the remote repository.
+
+Navigate back to the main project screen.
+
+Ensure the correct repository is selected.
+
+Click the Push Repository button. The app will sync your local changes with the remote repository.
 
 ---
 ## Disclaimer
