@@ -88,6 +88,9 @@ You can now create projects in the repository. Remember that GitHub doesn't trac
 
 * **Desktop Shortcut**: If you wish to create a desktop shortcut, a utility for this is available at the bottom of the **Settings** screen.
 
+
+- If you are pulling from a repository with progress, you may need to use the heal button (+) to regenerate empty folders.
+
 ---
 
 ## Usage
