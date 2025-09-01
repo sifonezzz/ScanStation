@@ -42,6 +42,7 @@
   },
   "dependencies": {
     "babel-runtime": "^6.26.0",
+    "chokidar": "^4.0.3",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^10.1.0",
     "fluent-ffmpeg": "^2.1.3",

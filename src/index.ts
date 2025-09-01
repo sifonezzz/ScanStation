@@ -721,7 +721,7 @@ ipcMain.on('set-selected-repository', (event, repoName: string) => {
     loadProjects(BrowserWindow.fromWebContents(event.sender), repoName);
 });
 
-Menu.setApplicationMenu(null);
+
 
 ipcMain.handle('add-repository', async (_, repoUrl: string) => {
     const repoName = getRepoNameFromUrl(repoUrl);
@@ -1236,7 +1236,7 @@ const createWindow = (): BrowserWindow => {
     },
   });
 
-  
+  Menu.setApplicationMenu(null);
 
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
   
