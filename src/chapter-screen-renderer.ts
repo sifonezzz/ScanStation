@@ -104,7 +104,7 @@ window.addEventListener('DOMContentLoaded', () => {
         showTranslateView(0);
     });
 
-    proofreadBtn.addEventListener('click', async () => {
+  proofreadBtn.addEventListener('click', async () => {
     await activeView.saveData();
     
 
@@ -422,6 +422,8 @@ function initProofreadView(startingIndex: number) {
     },
   };
 
+
+  
   const loadPage = async (index: number) => {
     if (index < 0 || index >= pages.length) return;
     if (currentPageIndex !== index && pages[currentPageIndex]) { await saveAnnotations(); }
@@ -429,33 +431,52 @@ function initProofreadView(startingIndex: number) {
     const page = pages[currentPageIndex];
     pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
 
-    // The backend now tells us if it's a spread by using a filename like "14-15.jpg"
-    const isSpread = /^\d+[-_]\d+\..+$/.test(page.fileName);
+    // --- NEW LOGIC STARTS HERE ---
     
+    // Clear images while loading to prevent showing the old page
+    rawImage.src = '';
+    tsImage.src = '';
+
+    const isSpread = /^\d+[-_]\d+\..+$/.test(page.fileName);
+
+    // Get raw image path (this logic correctly handles stitched spreads)
+    let rawImagePath: string;
     if (isSpread) {
-        // It's a spread, so we call the stitching function
         const result = await window.api.getStitchedRawSpread({
             chapterPath: currentChapterPath,
             pageFile: page.fileName
         });
         if (result.success) {
-            rawImage.src = `scanstation-asset:///${result.filePath.replace(/\\/g, '/')}?t=${Date.now()}`;
+            rawImagePath = result.filePath;
         } else {
-            rawImage.src = ''; 
             console.error('Failed to load spread:', result.error);
         }
     } else {
-        // It's a single page, load the raw as usual
-        const rawPath = `${currentChapterPath}/Raws/${page.fileName}`.replace(/\\/g, '/');
-        rawImage.src = `scanstation-asset:///${rawPath}`;
+        // For single pages, we get the path from our new, reliable handler
+        const imagePaths = await window.api.getProofreadImages({ chapterPath: currentChapterPath, pageFile: page.fileName });
+        if (imagePaths.success) {
+            rawImagePath = imagePaths.rawPath;
+        }
     }
     
-    // Load the typeset image (which could be a spread or a single)
-    const tsPath = `${currentChapterPath}/Typesetted/${page.fileName}`.replace(/\\/g, '/');
-    tsImage.src = `scanstation-asset:///${tsPath}?t=${Date.now()}`;
+    // Get typeset image path using the new handler that finds the file regardless of extension
+    const imagePaths = await window.api.getProofreadImages({ chapterPath: currentChapterPath, pageFile: page.fileName });
+    if (imagePaths.success) {
+        // Use a timestamp to bust the browser's cache for both images
+        const timestamp = `?t=${Date.now()}`;
+        if (rawImagePath) {
+            rawImage.src = `scanstation-asset:///${rawImagePath.replace(/\\/g, '/')}?${timestamp}`;
+        }
+        tsImage.src = `scanstation-asset:///${imagePaths.tsPath.replace(/\\/g, '/')}?${timestamp}`;
+    } else {
+        console.error('Failed to load typeset image:', imagePaths.error);
+    }
+
+    // Keep the onerror handler in case the typeset file is missing or corrupted
     tsImage.onerror = () => { tsImage.src = ''; };
 
-    const annotations = await window.api.getFileContent(`${currentChapterPath}/data/PR Data/${page.fileName}_proof.txt`);
+    // Load annotations as before
+    const annotations = await window.api.getFileContent(`${currentChapterPath}/data/PR Data/${getBaseName(page.fileName)}_proof.txt`);
     annotationsText.value = annotations;
   };
 

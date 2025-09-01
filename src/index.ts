@@ -149,6 +149,35 @@ ipcMain.on('start-watching-chapter', (event, chapterPath: string) => {
     });
 });
 
+ipcMain.handle('get-proofread-images', async (_, { chapterPath, pageFile }) => {
+    try {
+        const baseName = getBaseName(pageFile);
+
+        // Define paths for raw and typeset directories
+        const rawDir = path.join(chapterPath, 'Raws');
+        const typesetDir = path.join(chapterPath, 'Typesetted');
+
+        // Find the full filename in the Typesetted folder
+        const allTypesetFiles = await fs.readdir(typesetDir);
+        const typesetFileName = allTypesetFiles.find(f => getBaseName(f) === baseName);
+
+        if (!typesetFileName) {
+            // If no matching typeset file is found, return an error
+            return { success: false, error: `Typeset file for ${baseName} not found.` };
+        }
+        
+        // Return the full paths for both raw and the found typeset file
+        return {
+            success: true,
+            rawPath: path.join(rawDir, pageFile),
+            tsPath: path.join(typesetDir, typesetFileName)
+        };
+    } catch (error) {
+        console.error('Failed to get proofread images:', error);
+        return { success: false, error: error.message };
+    }
+});
+
 ipcMain.on('stop-watching-chapter', () => {
     if (chapterWatcher) {
         console.log('Stopping chapter watcher.');

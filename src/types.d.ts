@@ -31,6 +31,8 @@ export interface IScanstationAPI {
   stopWatchingChapter: () => void;
   onFileAdded: (callback: () => void) => void;
   renameFilesInFolder: (data: { chapterPath: string; folderName: string; }) => Promise<{ success: boolean; message: string; }>; 
+  getProofreadImages: (data: { chapterPath: string; pageFile: string; }) => Promise<{ success: boolean; rawPath?: string; tsPath?: string; error?: string; }>;
+
   // Settings Window
   openSettingsWindow: () => void;
   closeSettingsWindow: () => void;

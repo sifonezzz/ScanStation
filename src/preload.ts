@@ -25,6 +25,8 @@ const api: IScanstationAPI = {
   stopWatchingChapter: () => ipcRenderer.send('stop-watching-chapter'), 
   onFileAdded: (callback) => ipcRenderer.on('file-added-to-chapter', callback),
   renameFilesInFolder: (data) => ipcRenderer.invoke('rename-files-in-folder', data),
+  getProofreadImages: (data) => ipcRenderer.invoke('get-proofread-images', data),
+
 
   // --- Settings Window ---
   openSettingsWindow: () => ipcRenderer.send('open-settings-window'),
