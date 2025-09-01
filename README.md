@@ -1,24 +1,7 @@
 # ScanStation
-![SS](assets/pictures/SS.png)
-A collaboration tool for solo and group scanlation projects.
+![SS](assets/pictures/ssintro.png)
 
 *This application was built with the extensive support of Gemini.*
-
-## Features
-
-
-- **Project-Based Workflow**: Organize your work into projects, each with its own chapters and cover image.
-
-![ScanStation Main View](assets/pictures/Main%20View.png)
-
-
-- **Git-Powered Backend**: ScanStation uses GitHub repositories to store and sync your project files allowing for easy collaboration between group members.
-- **Multi-Step Page Tracking**: A sidebar tracks the status of each page through the entire scanlation workflow: Cleaning (CL), Translation (TL), Typesetting (TS), and Proofreading (PR/QC).
-- **Chapter Progress Dashboard**: Get an overview of a chapter's completion status with clear progress bars for each step of the process.
-- **Dedicated Workflow Views**:
-    - **Translation View**: A side-by-side view of the raw page and a text editor, with the function to draw on the raw to ennumerate speech bubbles.
-    - **Proofread View**: Compare the raw and typeset images directly on a side-by-side view, with a dedicated text box for corrections and annotations. Pages with annotations get circled on the status bar.
-    - **Typesetting Helper**: Provides the typesetter with the cleaned page and the final translated text, along with buttons to quickly open the image in an external editor.
 
 ---
 
