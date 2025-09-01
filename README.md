@@ -1,7 +1,6 @@
-# ScanStation
 ![SS](assets/pictures/ssintro.png)
 
-*This application was built with the extensive support of Gemini.*
+<p style="text-align: center;">*This application was built with the extensive support of Gemini.*<p>
 
 ---
 
