@@ -119,16 +119,16 @@ Use the Views:
 
 Click the Translate button to open the translation view. Here, you can write the script and draw on the image to mark bubbles. Your work is saved automatically.
 
-Once pages are cleaned and placed in the Raws Cleaned folder, click the Typeset button. This view shows the cleaned page and the translated text, with buttons to open the image in an external editor like Photoshop.
+Once pages are cleaned and placed in the Raws Cleaned folder, click the Typeset button. This view shows the cleaned page and the translated text, with buttons to open the image in external editors.
 
-After a page is typeset and placed in the Typesetted folder, click the Proofread button. This view shows a side-by-side comparison of the raw and typeset images for final checks. You can write corrections in the annotations box.
+After a page is typeset and placed in the Typesetted folder, click the Proofread button. This view shows a side-by-side comparison of the raw and typeset images for final checks. You can write corrections in the annotations box. These annotations then get circled on the status bar for other collaborators to fix.
 
 Track Progress: The sidebar on the right shows the status of every page (CL, TL, TS, PR, QC). The CL (Cleaned) and TS (Typeset) statuses update automatically when you add files to the corresponding folders.
 
 Finalize a Page: In the Proofread view, clicking the "Page is Correct" button will copy the typeset file to the Final folder, ready for release.
 
 4. Push Your Work
-To share your progress and make your files available to collaborators, you must push your changes to the remote repository.
+To share your progress and make your files available to other collaborators, you must push your changes to the remote repository.
 
 Navigate back to the main project screen.
 
@@ -140,6 +140,10 @@ Click the Push Repository button. The app will sync your local changes with the 
 ## Disclaimer
 This app is in its first stage, and it is heavily recommended that you keep track of all your files before working with it. The app automatically creates a backup of all repositories in a `backup` folder located next to your main projects folder (e.g., `.../Scanstation/backup`).
 
+ScanStation ONLY stores your Git key locally, but it's important to understand how.
+
+The key is saved in a plain text configuration file on your computer. This means that anyone with access to that file could view your key. For this reason I strongly recommend following the advice in the setup guide: Use a dedicated GitHub account for scanlations and create a token with only the necessary repo permissions.
+
 ## Kofi
-If you wish to donate I would be extremely grateful :D
+If you wish to donate, I would be extremely grateful :D
 https://ko-fi.com/sifonezz
