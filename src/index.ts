@@ -40,6 +40,10 @@ let chapterWatcher: chokidar.FSWatcher | null = null;
 let spreadCache = new Map<string, string>();
 
 
+function getBaseName(fileName: string): string {
+    return path.basename(fileName, path.extname(fileName));
+}
+
 function getRepoNameFromUrl(url: string): string | null {
     const match = url.match(/([^\/]+)\.git$/);
     return match ? match[1] : null;
@@ -156,52 +160,44 @@ ipcMain.on('stop-watching-chapter', () => {
 
 ipcMain.handle('get-stitched-raw-spread', async (_, { chapterPath, pageFile }) => {
     const cacheKey = `${chapterPath}_${pageFile}`;
-    
-    // 1. Check if a cached version exists and is accessible
     if (spreadCache.has(cacheKey) && await fs.pathExists(spreadCache.get(cacheKey))) {
         return { success: true, filePath: spreadCache.get(cacheKey) };
     }
-
     try {
-        const spreadMatch = pageFile.match(/(\d+)[-_](\d+)\..+/);
+        const spreadMatch = getBaseName(pageFile).match(/(\d+)[-_](\d+)/);
         if (!spreadMatch) {
             return { success: false, error: 'Filename does not match spread pattern (e.g., 02-03.jpg).' };
         }
 
-        // Lower number is page 1, higher is page 2
         const pageNum1 = spreadMatch[1].padStart(2, '0');
         const pageNum2 = spreadMatch[2].padStart(2, '0');
 
         const rawsDir = path.join(chapterPath, 'Raws');
         const allRaws = await fs.readdir(rawsDir);
 
-        const rawFile1 = allRaws.find(f => f.startsWith(pageNum1));
-        const rawFile2 = allRaws.find(f => f.startsWith(pageNum2));
+        const rawFile1 = allRaws.find(f => getBaseName(f).startsWith(pageNum1));
+        const rawFile2 = allRaws.find(f => getBaseName(f).startsWith(pageNum2));
 
         if (!rawFile1 || !rawFile2) {
             return { success: false, error: `Could not find raw files for pages ${pageNum1} and ${pageNum2}.` };
         }
 
-        const image1 = await Jimp.read(path.join(rawsDir, rawFile1)); // Lower page number
-        const image2 = await Jimp.read(path.join(rawsDir, rawFile2)); // Higher page number
+        const image1 = await Jimp.read(path.join(rawsDir, rawFile1));
+        const image2 = await Jimp.read(path.join(rawsDir, rawFile2));
 
         const totalWidth = image1.getWidth() + image2.getWidth();
         const maxHeight = Math.max(image1.getHeight(), image2.getHeight());
-
         const stitchedImage = await new Jimp(totalWidth, maxHeight, '#FFFFFF');
         
-        // 2. Composite with higher number on the left for right-to-left reading
-        stitchedImage.composite(image2, 0, 0); // Higher page number (e.g., 15)
-        stitchedImage.composite(image1, image2.getWidth(), 0); // Lower page number (e.g., 14)
+        stitchedImage.composite(image2, 0, 0); 
+        stitchedImage.composite(image1, image2.getWidth(), 0);
 
         const tempDir = path.join(app.getPath('temp'), 'scanstation');
         await fs.ensureDir(tempDir);
         const tempFilePath = path.join(tempDir, `spread-${Date.now()}.jpg`);
         await stitchedImage.writeAsync(tempFilePath);
 
-        // 3. Save the new file path to the cache
         spreadCache.set(cacheKey, tempFilePath);
-
         return { success: true, filePath: tempFilePath };
     } catch (error) {
         console.error('Failed to stitch spread:', error);
@@ -948,56 +944,53 @@ ipcMain.handle('get-chapter-page-status', async (_, chapterPath: string) => {
             .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
             .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-        const cleanedFiles = new Set(await fs.readdir(path.join(chapterPath, 'Raws Cleaned')));
-        // ▼▼▼ THIS IS THE CORRECTED LINE ▼▼▼
-        const typesetFiles = new Set(await fs.readdir(path.join(chapterPath, 'Typesetted')));
-        // ▲▲▲ END OF CORRECTION ▲▲▲
+        const cleanedFiles = await fs.readdir(path.join(chapterPath, 'Raws Cleaned'));
+        const typesetFiles = await fs.readdir(path.join(chapterPath, 'Typesetted'));
+        const cleanedBaseNames = new Set(cleanedFiles.map(getBaseName));
+        const typesetBaseNames = new Set(typesetFiles.map(getBaseName));
         const statusData = await getChapterStatus(chapterPath);
 
-        let finalPages = rawFiles.map(pageFile => ({
-            fileName: pageFile,
-            status: {
-                CL: cleanedFiles.has(pageFile),
-                TS: typesetFiles.has(pageFile), // Now this will work correctly
-                TL: (statusData[pageFile] || {}).TL || false,
-                PR: (statusData[pageFile] || {}).PR || false,
-                QC: (statusData[pageFile] || {}).QC || false,
-            }
-        }));
+        let finalPages = rawFiles.map(pageFile => {
+            const baseName = getBaseName(pageFile);
+            return {
+                fileName: pageFile,
+                status: {
+                    CL: cleanedBaseNames.has(baseName),
+                    TS: typesetBaseNames.has(baseName),
+                    TL: (statusData[pageFile] || {}).TL || false,
+                    PR: (statusData[pageFile] || {}).PR || false,
+                    QC: (statusData[pageFile] || {}).QC || false,
+                }
+            };
+        });
 
-        const typesetSpreads = Array.from(typesetFiles).filter(f => /^\d+[-_]\d+\..+$/.test(f as string));
+        const typesetSpreads = typesetFiles.filter(f => /^\d+[-_]\d+\..+$/.test(f));
 
         for (const spreadFile of typesetSpreads) {
-            const spreadMatch = (spreadFile as string).match(/(\d+)[-_](\d+)\..+/);
+            const spreadMatch = getBaseName(spreadFile).match(/(\d+)[-_](\d+)/);
             if (!spreadMatch) continue;
 
             const pageNum1 = spreadMatch[1].padStart(2, '0');
             const pageNum2 = spreadMatch[2].padStart(2, '0');
-
-            const firstPageIndex = finalPages.findIndex(p => p.fileName.startsWith(pageNum1));
+            
+            const firstPageIndex = finalPages.findIndex(p => getBaseName(p.fileName).startsWith(pageNum1));
             
             if (firstPageIndex !== -1) {
-                finalPages = finalPages.filter(p => !p.fileName.startsWith(pageNum1) && !p.fileName.startsWith(pageNum2));
-
+                finalPages = finalPages.filter(p => !getBaseName(p.fileName).startsWith(pageNum1) && !getBaseName(p.fileName).startsWith(pageNum2));
                 const spreadPageEntry = {
-                    fileName: spreadFile as string,
+                    fileName: spreadFile,
                     status: {
-                        CL: true,
-                        TS: true,
-                        TL: true,
+                        CL: true, TS: true, TL: true,
                         PR: (statusData[spreadFile] || {}).PR || false,
                         QC: (statusData[spreadFile] || {}).QC || false,
                     }
                 };
-                
                 finalPages.splice(firstPageIndex, 0, spreadPageEntry);
             }
         }
-
         return { success: true, pages: finalPages };
     } catch (error) {
         console.error('Error Loading Pages:', error);
-        dialog.showErrorBox('Error Loading Pages', `Could not read page folders. Error: ${error.message}`);
         return { success: false, pages: [] };
     }
 });
@@ -1085,24 +1078,32 @@ ipcMain.handle('save-proofread-data', async (_, { chapterPath, pageFile, annotat
 // Marks a page as correct, copies it to the Final folder, and updates its status
 ipcMain.handle('mark-page-correct', async (_, { chapterPath, pageFile }) => {
     try {
-        const typesetPath = path.join(chapterPath, 'Typesetted', pageFile);
-        if (!await fs.pathExists(typesetPath)) {
+        const typesetDir = path.join(chapterPath, 'Typesetted');
+        const allTypesetFiles = await fs.readdir(typesetDir);
+        
+        // Find the full filename in the Typesetted folder based on the base name of the pageFile
+        const baseName = getBaseName(pageFile);
+        const typesetFileName = allTypesetFiles.find(f => getBaseName(f) === baseName);
+
+        if (!typesetFileName) {
           return { success: false, error: 'Typeset file not found.' };
         }
         
-        await fs.copy(typesetPath, path.join(chapterPath, 'Final', pageFile), { overwrite: true });
+        const typesetPath = path.join(typesetDir, typesetFileName);
+        await fs.copy(typesetPath, path.join(chapterPath, 'Final', typesetFileName), { overwrite: true });
         
         const status = await getChapterStatus(chapterPath);
-        if (!status[pageFile]) status[pageFile] = {};
-        status[pageFile].PR = true;
-        status[pageFile].QC = true;
+        // Use the raw pageFile name as the key, even for spreads
+        const statusKey = pageFile.includes('-') ? spreadCache.get(`${chapterPath}_${pageFile}_raw`) || pageFile : pageFile;
+        if (!status[statusKey]) status[statusKey] = {};
+        status[statusKey].PR = true;
+        status[statusKey].QC = true;
         await saveChapterStatus(chapterPath, status);
 
-        // Update path to look in PR Data folder
-        const annotationsPath = path.join(chapterPath, 'data', 'PR Data', `${pageFile}_proof.txt`);
+        const annotationsPath = path.join(chapterPath, 'data', 'PR Data', `${baseName}_proof.txt`);
         if(await fs.pathExists(annotationsPath)) await fs.remove(annotationsPath);
 
-        return { success: true, newStatus: status[pageFile] };
+        return { success: true, newStatus: status[statusKey] };
     } catch (error) {
         console.error('Error marking page as correct:', error);
         return { success: false, error: error.message };
@@ -1225,14 +1226,15 @@ const createWindow = (): BrowserWindow => {
     ...lastWindowBounds,
     minWidth: 1100,
     minHeight: 720,
-    show: false, // The main window will start hidden
+    show: false,
     backgroundColor: '#23272a',
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       sandbox: false,
-      // Add these two lines:
       contextIsolation: true,
       nodeIntegration: false,
+      webgl: true,
+      // offscreen: true        // <-- DELETE THIS LINE
     },
   });
 
@@ -1240,14 +1242,12 @@ const createWindow = (): BrowserWindow => {
 
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
   
-  
   mainWindow.once('ready-to-show', () => {
     const selectedRepo = getSetting<string>('selectedRepository');
     if (selectedRepo) {
       loadProjects(mainWindow, selectedRepo);
     }
   });
-
   return mainWindow;
 };
 

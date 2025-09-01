@@ -3,6 +3,14 @@ import translateViewHtml from './translate-view.html';
 import proofreadViewHtml from './proofread-view.html';
 import typesetViewHtml from './typeset-view.html';
 
+function getBaseName(fileName: string): string {
+    const parts = fileName.split('.');
+    if (parts.length > 1) {
+        parts.pop(); // Remove the last part (the extension)
+    }
+    return parts.join('.');
+}
+
 // --- Type Definitions ---
 interface PageStatus { CL: boolean; TL: boolean; TS: boolean; PR: boolean | 'annotated'; QC: boolean | 'annotated'; }
 interface Page { fileName: string; status: PageStatus; }
@@ -97,20 +105,35 @@ window.addEventListener('DOMContentLoaded', () => {
     });
 
     proofreadBtn.addEventListener('click', async () => {
-        await activeView.saveData();
-        document.body.style.cursor = 'wait';
-        const spreadPages = pages.filter(p => /^\d+[-_]\d+\..+$/.test(p.fileName));
-        for (const spread of spreadPages) {
-            window.api.getStitchedRawSpread({
-                chapterPath: currentChapterPath,
-                pageFile: spread.fileName
-            });
-        }
-        const firstAnnotatedPage = pages.findIndex(p => p.status.PR === 'annotated');
-        showProofreadView(firstAnnotatedPage >= 0 ? firstAnnotatedPage : 0);
-        document.body.style.cursor = 'default';
-    });
+    await activeView.saveData();
+    
 
+    const originalText = proofreadBtn.innerHTML;
+    proofreadBtn.innerHTML = 'Loading...';
+    proofreadBtn.setAttribute('disabled', 'true');
+
+
+    document.body.style.cursor = 'wait';
+    const spreadPages = pages.filter(p => /^\d+[-_]\d+\..+$/.test(p.fileName));
+    
+    // Wait for all spreads to be pre-loaded and cached
+    await Promise.all(spreadPages.map(spread => 
+        window.api.getStitchedRawSpread({
+            chapterPath: currentChapterPath,
+            pageFile: spread.fileName
+        })
+    ));
+
+    const firstAnnotatedPage = pages.findIndex(p => p.status.PR === 'annotated');
+    showProofreadView(firstAnnotatedPage >= 0 ? firstAnnotatedPage : 0);
+    
+    document.body.style.cursor = 'default';
+    
+ 
+    proofreadBtn.innerHTML = originalText;
+    proofreadBtn.removeAttribute('disabled');
+
+  });
     typesetBtn.addEventListener('click', async () => {
         await activeView.saveData();
         showTypesetView(0);
@@ -467,8 +490,6 @@ function initTypesetView(startingIndex: number) {
   const prevBtn = document.getElementById('typeset-prev-btn') as HTMLButtonElement;
   const showCleanedBtn = document.getElementById('show-cleaned-btn') as HTMLButtonElement;
   const showRawBtn = document.getElementById('show-raw-btn') as HTMLButtonElement;
-  
-  // ▼▼▼ ADDED a canvas and its context here ▼▼▼
   const drawingCanvas = document.getElementById('typeset-drawing-canvas') as HTMLCanvasElement;
   const ctx = drawingCanvas.getContext('2d');
 
@@ -484,10 +505,9 @@ function initTypesetView(startingIndex: number) {
     },
   };
 
-  // ▼▼▼ ADDED this function to draw on the canvas ▼▼▼
   const redrawTypesetCanvas = (drawingData: DrawingData) => {
     if (!mainImage.clientWidth || !mainImage.clientHeight || !drawingData || !drawingData.lines) {
-      ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height); // Clear if no data
+      ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
       return;
     }
     const imgRect = mainImage.getBoundingClientRect();
@@ -529,16 +549,13 @@ function initTypesetView(startingIndex: number) {
     
     mainImage.onerror = () => { mainImage.src = ''; };
 
-    // ▼▼▼ MODIFIED to load drawing data here ▼▼▼
-    const drawingData = await window.api.getJsonContent(`${currentChapterPath}/data/TL Data/${page.fileName}_drawing.json`);
+    const drawingData = await window.api.getJsonContent(`${currentChapterPath}/data/TL Data/${getBaseName(page.fileName)}_drawing.json`);
     
-    // Ensure canvas redraws after image loads
     if (mainImage.complete) {
         redrawTypesetCanvas(drawingData);
     } else {
         mainImage.onload = () => redrawTypesetCanvas(drawingData);
     }
-    // Also attach a resize listener
     window.addEventListener('resize', () => redrawTypesetCanvas(drawingData));
   };
 
@@ -550,7 +567,7 @@ function initTypesetView(startingIndex: number) {
     
     await updateImageView();
 
-    const translatedText = await window.api.getFileContent(`${currentChapterPath}/data/TL Data/${page.fileName}.txt`);
+    const translatedText = await window.api.getFileContent(`${currentChapterPath}/data/TL Data/${getBaseName(page.fileName)}.txt`);
     translationTextDiv.textContent = translatedText || 'No translation text found for this page.';
   };
 
@@ -570,8 +587,11 @@ function initTypesetView(startingIndex: number) {
   document.querySelectorAll('.external-editor-buttons button').forEach(button => {
     button.addEventListener('click', () => {
       const editor = (button as HTMLElement).dataset.editor as Editor;
+      const page = pages[currentPageIndex];
+      if (!page) return;
+      
       const folder = currentImageType === 'cleaned' ? 'Raws Cleaned' : 'Raws';
-      const filePath = `${currentChapterPath}/${folder}/${pages[currentPageIndex].fileName}`;
+      const filePath = `${currentChapterPath}/${folder}/${page.fileName}`;
       window.api.openFileInEditor({ editor, filePath });
     });
   });
