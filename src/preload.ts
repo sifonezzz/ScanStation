@@ -20,6 +20,11 @@ const api: IScanstationAPI = {
   saveProofreadData: (data: any) => ipcRenderer.invoke('save-proofread-data', data),
   markPageCorrect: (data: any) => ipcRenderer.invoke('mark-page-correct', data),
   openFileInEditor: (data: any) => ipcRenderer.invoke('open-file-in-editor', data),
+  getStitchedRawSpread: (data) => ipcRenderer.invoke('get-stitched-raw-spread', data),
+  startWatchingChapter: (chapterPath) => ipcRenderer.send('start-watching-chapter', chapterPath),
+  stopWatchingChapter: () => ipcRenderer.send('stop-watching-chapter'), 
+  onFileAdded: (callback) => ipcRenderer.on('file-added-to-chapter', callback),
+  renameFilesInFolder: (data) => ipcRenderer.invoke('rename-files-in-folder', data),
 
   // --- Settings Window ---
   openSettingsWindow: () => ipcRenderer.send('open-settings-window'),
@@ -71,6 +76,7 @@ const api: IScanstationAPI = {
   gitPush: (repoName: string) => ipcRenderer.invoke('git-push', { repoName }),
   gitPull: (repoName: string) => ipcRenderer.invoke('git-pull', repoName),
   gitSyncRepository: (repoName: string) => ipcRenderer.invoke('git-sync-repository', repoName),
+  resolveConflictForcePush: (repoName) => ipcRenderer.invoke('resolve-conflict-force-push', repoName),
 
   // --- Universal APIs ---
   selectCoverImage: () => ipcRenderer.send('select-cover-image'),
@@ -78,6 +84,7 @@ const api: IScanstationAPI = {
   setGitIdentity: (data) => ipcRenderer.invoke('set-git-identity', data),
   openExternalLink: (url: string) => ipcRenderer.send('open-external-link', url),
   onCoverImageSelected: (callback: (path: string) => void) => ipcRenderer.on('cover-image-selected', (_event, path) => callback(path)),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
 };
 
 contextBridge.exposeInMainWorld('api', api);

@@ -1,12 +1,13 @@
 import { AppStore } from './settings';
 
-import { app, BrowserWindow, ipcMain, dialog, protocol, session, shell, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, protocol, session, shell, Menu, screen } from 'electron';
 import path from 'path';
 import fs from 'fs-extra';
 import simpleGit, { SimpleGit } from 'simple-git';
 import Jimp from 'jimp';
 import { getSetting, setSetting, deleteSetting } from './settings';
 import { exec, execFile } from 'child_process';
+import * as chokidar from 'chokidar';
 
 // Declare the entry points for Webpack.
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
@@ -35,6 +36,8 @@ let lastWindowBounds: Electron.Rectangle = { width: 1024, height: 768, x: undefi
 let splashWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let welcomeWindow: BrowserWindow | null = null;
+let chapterWatcher: chokidar.FSWatcher | null = null;
+let spreadCache = new Map<string, string>();
 
 
 function getRepoNameFromUrl(url: string): string | null {
@@ -105,6 +108,11 @@ ipcMain.handle('get-editor-paths', () => {
         gimp: getSetting('gimpPath'),
     };
 });
+
+ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
+});
+
 ipcMain.handle('select-editor-path', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
         properties: ['openFile'],
@@ -115,6 +123,90 @@ ipcMain.handle('select-editor-path', async () => {
 ipcMain.handle('set-editor-path', (_, { editor, path }: { editor: string, path: string }) => {
     const key = `${editor}Path` as keyof AppStore;
     setSetting(key, path);
+});
+
+ipcMain.on('start-watching-chapter', (event, chapterPath: string) => {
+    if (chapterWatcher) {
+        chapterWatcher.close(); 
+    }
+
+    chapterWatcher = chokidar.watch(chapterPath, {
+        ignored: /(^|[\/\\])\../, 
+        persistent: true,
+        ignoreInitial: true, 
+    });
+
+    chapterWatcher.on('add', () => {
+        console.log('New file detected, notifying renderer.');
+        const window = BrowserWindow.fromWebContents(event.sender);
+        if (window && !window.isDestroyed()) {
+            window.webContents.send('file-added-to-chapter');
+        }
+    });
+});
+
+ipcMain.on('stop-watching-chapter', () => {
+    if (chapterWatcher) {
+        console.log('Stopping chapter watcher.');
+        chapterWatcher.close();
+        chapterWatcher = null;
+    }
+    spreadCache.clear();
+});
+
+ipcMain.handle('get-stitched-raw-spread', async (_, { chapterPath, pageFile }) => {
+    const cacheKey = `${chapterPath}_${pageFile}`;
+    
+    // 1. Check if a cached version exists and is accessible
+    if (spreadCache.has(cacheKey) && await fs.pathExists(spreadCache.get(cacheKey))) {
+        return { success: true, filePath: spreadCache.get(cacheKey) };
+    }
+
+    try {
+        const spreadMatch = pageFile.match(/(\d+)[-_](\d+)\..+/);
+        if (!spreadMatch) {
+            return { success: false, error: 'Filename does not match spread pattern (e.g., 02-03.jpg).' };
+        }
+
+        // Lower number is page 1, higher is page 2
+        const pageNum1 = spreadMatch[1].padStart(2, '0');
+        const pageNum2 = spreadMatch[2].padStart(2, '0');
+
+        const rawsDir = path.join(chapterPath, 'Raws');
+        const allRaws = await fs.readdir(rawsDir);
+
+        const rawFile1 = allRaws.find(f => f.startsWith(pageNum1));
+        const rawFile2 = allRaws.find(f => f.startsWith(pageNum2));
+
+        if (!rawFile1 || !rawFile2) {
+            return { success: false, error: `Could not find raw files for pages ${pageNum1} and ${pageNum2}.` };
+        }
+
+        const image1 = await Jimp.read(path.join(rawsDir, rawFile1)); // Lower page number
+        const image2 = await Jimp.read(path.join(rawsDir, rawFile2)); // Higher page number
+
+        const totalWidth = image1.getWidth() + image2.getWidth();
+        const maxHeight = Math.max(image1.getHeight(), image2.getHeight());
+
+        const stitchedImage = await new Jimp(totalWidth, maxHeight, '#FFFFFF');
+        
+        // 2. Composite with higher number on the left for right-to-left reading
+        stitchedImage.composite(image2, 0, 0); // Higher page number (e.g., 15)
+        stitchedImage.composite(image1, image2.getWidth(), 0); // Lower page number (e.g., 14)
+
+        const tempDir = path.join(app.getPath('temp'), 'scanstation');
+        await fs.ensureDir(tempDir);
+        const tempFilePath = path.join(tempDir, `spread-${Date.now()}.jpg`);
+        await stitchedImage.writeAsync(tempFilePath);
+
+        // 3. Save the new file path to the cache
+        spreadCache.set(cacheKey, tempFilePath);
+
+        return { success: true, filePath: tempFilePath };
+    } catch (error) {
+        console.error('Failed to stitch spread:', error);
+        return { success: false, error: error.message };
+    }
 });
 
 ipcMain.handle('get-git-identity', (): Promise<{ name: string; email: string }> => {
@@ -291,7 +383,6 @@ function openEditProjectWindow(repoName: string, projectName: string) {
   editProjectWindow.loadURL(EDIT_PROJECT_WINDOW_WEBPACK_ENTRY);
 }
 
-// --- Reusable Helper for Authenticated Push ---
 async function performAuthenticatedPush(git: SimpleGit) {
     const pat = getSetting<string>('githubPat');
     if (!pat) {
@@ -304,14 +395,22 @@ async function performAuthenticatedPush(git: SimpleGit) {
         throw new Error('No "origin" remote found for this repository.');
     }
     
+    // ▼▼▼ NEW LOGIC to get the current branch name ▼▼▼
+    const branchSummary = await git.branch();
+    const currentBranch = branchSummary.current;
+    if (!currentBranch) {
+        throw new Error('Could not determine the current Git branch.');
+    }
+    // ▲▲▲ END OF NEW LOGIC ▲▲▲
+
     const originalUrl = origin.refs.push;
-    // CORRECTED LINE
     const cleanUrl = originalUrl.replace(/^(https:\/\/)(?:.*@)?(.*)$/, '$1$2');
     const authenticatedUrl = cleanUrl.replace('https://', `https://${pat}@`);
-
+    
     try {
         await git.remote(['set-url', 'origin', authenticatedUrl]);
-        await git.push('origin', 'main');
+        // Use the dynamically found branch name instead of hardcoding 'main'
+        await git.push('origin', currentBranch); 
     } finally {
         await git.remote(['set-url', 'origin', originalUrl]);
     }
@@ -321,6 +420,42 @@ async function performAuthenticatedPush(git: SimpleGit) {
 // --- IPC Handlers ---
 ipcMain.on('open-external-link', (_, url: string) => {
     shell.openExternal(url);
+});
+
+ipcMain.handle('rename-files-in-folder', async (_, { chapterPath, folderName }) => {
+    const targetDir = path.join(chapterPath, folderName);
+    try {
+        const files = (await fs.readdir(targetDir))
+            .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
+            .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+        if (files.length === 0) {
+            return { success: true, message: 'No image files found to rename.' };
+        }
+
+        // 1. First pass: Rename all files to temporary names to avoid conflicts
+        const tempRenames = files.map((file, index) => ({
+            oldPath: path.join(targetDir, file),
+            tempPath: path.join(targetDir, `__temp_${index}${path.extname(file)}`),
+        }));
+        for (const op of tempRenames) {
+            await fs.rename(op.oldPath, op.tempPath);
+        }
+
+        // 2. Second pass: Rename from temporary to final names
+        const finalRenames = tempRenames.map((op, index) => ({
+            tempPath: op.tempPath,
+            newPath: path.join(targetDir, `${String(index + 1).padStart(2, '0')}${path.extname(op.tempPath)}`),
+        }));
+        for (const op of finalRenames) {
+            await fs.rename(op.tempPath, op.newPath);
+        }
+        
+        return { success: true, message: `Successfully renamed ${files.length} files in "${folderName}".` };
+    } catch (error) {
+        console.error(`Failed to rename files in ${folderName}:`, error);
+        return { success: false, message: `An error occurred: ${error.message}` };
+    }
 });
 
 ipcMain.on('open-create-project-window', (_, repoName) => openCreateProjectWindow(repoName));
@@ -369,61 +504,27 @@ ipcMain.handle('open-file-in-editor', async (_, { editor, filePath }: { editor: 
 ipcMain.handle('git-pull', async (_, repoName: string) => {
     const repoPath = path.join(getStoragePath(), repoName);
     const git = simpleGit(repoPath);
-    const pat = getSetting<string>('githubPat');
-    if (!await fs.pathExists(path.join(repoPath, '.git'))) {
-        throw new Error(
-            `The folder for '${repoName}' is not a valid Git repository.\n\n` +
-            `Please remove the existing folder from your projects directory and add the repository again.`
-        );
-    }
 
     try {
-        const pullAction = async (gitInstance: SimpleGit) => {
-            try {
-                const pullSummary = await gitInstance.pull();
-                if (pullSummary.files.length === 0 && pullSummary.summary.changes === 0) {
-                    return { success: true, message: 'Repository is already up-to-date.' };
-                }
-                return { success: true, message: `Successfully pulled changes!\nFiles changed: ${pullSummary.summary.changes}` };
-            } catch (pullError) {
-                if (pullError.message.includes('refusing to merge unrelated histories')) {
-                    // Retry the pull with the flag that allows merging unrelated histories
-                    await gitInstance.pull(null, null, ['--allow-unrelated-histories']);
-                    return { success: true, message: 'Successfully merged unrelated histories from the remote repository.' };
-                }
-                // Re-throw any other type of pull error
-                throw pullError;
-            }
-        };
-
-        if (pat) {
-            const remotes = await git.getRemotes(true);
-            const origin = remotes.find(r => r.name === 'origin');
-            if (origin) {
-                const originalUrl = origin.refs.fetch;
-                const cleanUrl = originalUrl.replace(/^(https:\/\/)(?:.*@)?(.*)$/, '$1$2');
-                const authenticatedUrl = cleanUrl.replace('https://', `https://${pat}@`);
-                try {
-                    await git.remote(['set-url', 'origin', authenticatedUrl]);
-                    return await pullAction(git);
-                } finally {
-                    await git.remote(['set-url', 'origin', originalUrl]);
-                }
-            }
+        const pullSummary = await git.pull();
+        if (pullSummary.files.length === 0 && pullSummary.summary.changes === 0) {
+            return { success: true, message: 'Repository is already up-to-date.' };
         }
-        return await pullAction(git);
-    } catch (error) {
-        if (error.message.includes('Already up to date')) {
-             return { success: true, message: 'Repository is already up-to-date.' };
+        return { success: true, message: `Successfully pulled changes!\nFiles changed: ${pullSummary.summary.changes}` };
+    } catch (error) { // <-- Underscore removed
+        // Check for a merge conflict error
+        if (error.message.includes('Merge conflict')) {
+            const status = await git.status();
+            return {
+                success: false,
+                conflict: true,
+                files: status.conflicted,
+                message: 'Merge conflict detected.'
+            };
         }
-        if (error.message.includes('no such ref was fetched')) {
-            throw new Error(
-                "Could not find the 'main' branch on the remote repository.\n\n" +
-                "This usually means the repository is empty. Please make an initial commit to the repository first."
-            );
-        }
+        // Handle other potential errors
         console.error(`Failed to pull repository ${repoName}:`, error);
-        throw error;
+        throw error; // Rethrow for the frontend to display a generic error
     }
 });
 
@@ -452,6 +553,7 @@ ipcMain.on('submit-project-creation', async (_, { repoName, name, path: coverPat
 ipcMain.on('open-project', (_, { repoName, projectName, chapterName }) => {
     const mainWindow = BrowserWindow.getAllWindows()[0];
     if (mainWindow) {
+        
         const chapterPath = path.join(getStoragePath(), repoName, projectName, chapterName);
         
         // 1. Load the correct chapter screen HTML file
@@ -459,6 +561,7 @@ ipcMain.on('open-project', (_, { repoName, projectName, chapterName }) => {
 
         // 2. After the page is loaded, send the data it needs
         mainWindow.webContents.once('dom-ready', () => {
+            mainWindow.setTitle(`${projectName} / ${chapterName}`);
             mainWindow.webContents.send('project-data-for-chapter-screen', { repoName, projectName, chapterName, chapterPath });
         });
     }
@@ -618,6 +721,8 @@ ipcMain.on('set-selected-repository', (event, repoName: string) => {
     loadProjects(BrowserWindow.fromWebContents(event.sender), repoName);
 });
 
+Menu.setApplicationMenu(null);
+
 ipcMain.handle('add-repository', async (_, repoUrl: string) => {
     const repoName = getRepoNameFromUrl(repoUrl);
     if (!repoName) {
@@ -742,51 +847,77 @@ ipcMain.handle('git-push', async (_, { repoName }) => {
     return { success: true };
 });
 
-ipcMain.handle('git-sync-repository', async (_, repoName: string) => {
+ipcMain.handle('git-sync-repository', async (event, repoName: string) => {
     const repoPath = path.join(getStoragePath(), repoName);
     const git = simpleGit(repoPath);
 
     try {
-        // First, commit any untracked or modified files
-        const preCommitStatus = await git.status();
-        if (!preCommitStatus.isClean()) {
-            await git.add('.');
-            await git.commit(`Sync: Scanstation auto-commit on ${new Date().toISOString()}`);
+        await git.fetch();
+        const status = await git.status();
+
+        if (status.conflicted.length > 0) {
+            // CONFLICT DETECTED!
+            return {
+                success: false,
+                conflict: true,
+                files: status.conflicted,
+                message: 'Merge conflict detected.'
+            };
         }
 
-        // Now, perform an authenticated fetch to get the latest remote state
-        const pat = getSetting<string>('githubPat');
-        if (pat) {
-            const remotes = await git.getRemotes(true);
-            const origin = remotes.find(r => r.name === 'origin');
-            if (origin) {
-                const originalUrl = origin.refs.fetch;
-                const cleanUrl = originalUrl.replace(/^(https:\/\/)(?:.*@)?(.*)$/, '$1$2');
-                const authenticatedUrl = cleanUrl.replace('https://', `https://${pat}@`);
-                try {
-                    await git.remote(['set-url', 'origin', authenticatedUrl]);
-                    await git.fetch();
-                } finally {
-                    await git.remote(['set-url', 'origin', originalUrl]);
-                }
+        if (status.behind > 0) {
+            // If behind, we must pull. A simple pull can create new conflicts.
+            await git.pull();
+            const postPullStatus = await git.status();
+            if (postPullStatus.conflicted.length > 0) {
+                return {
+                    success: false,
+                    conflict: true,
+                    files: postPullStatus.conflicted,
+                    message: 'Merge conflict detected after pulling changes.'
+                };
             }
-        } else {
-            // Fallback for public repositories
-            await git.fetch();
         }
-        
-        const postCommitStatus = await git.status();
 
-        // Check if the local branch is ahead of the remote
-        if (postCommitStatus.ahead > 0) {
-            await performAuthenticatedPush(git); // This function already handles its own auth
+        if (status.ahead > 0 || !status.isClean()) {
+            if (!status.isClean()) {
+                await git.add('.');
+                await git.commit(`Sync: Scanstation auto-commit on ${new Date().toISOString()}`);
+            }
+            await performAuthenticatedPush(git);
             return { success: true, message: 'Repository synced successfully!' };
-        } else {
-            return { success: true, message: 'Repository is already up-to-date.' };
         }
+
+        return { success: true, message: 'Repository is already up-to-date.' };
+
     } catch (error) {
+        if (error.message.includes('Merge conflict')) {
+            const status = await git.status();
+            return {
+                success: false,
+                conflict: true,
+                files: status.conflicted,
+                message: 'Merge conflict detected.'
+            };
+        }
         console.error(`Failed to sync repository ${repoName}:`, error);
-        throw error; // Rethrow for the renderer to display the error
+        throw error;
+    }
+});
+
+// Add this new handler to manage the force push
+ipcMain.handle('resolve-conflict-force-push', async (event, repoName) => {
+    const repoPath = path.join(getStoragePath(), repoName);
+    const git = simpleGit(repoPath);
+    try {
+        // Add all current files, commit them, and then force push
+        await git.add('.');
+        await git.commit('Force Push: Overwriting remote changes with local version.');
+        await performAuthenticatedPush(git.push(['--force']));
+        return { success: true, message: 'Successfully overwrote remote files with local versions.' };
+    } catch (error) {
+        console.error('Force push failed:', error);
+        throw error;
     }
 });
 
@@ -811,53 +942,61 @@ ipcMain.on('open-chapter-folder', (_, chapterPath: string) => {
     shell.openPath(chapterPath);
 });
 
-// Gathers the status of all pages in a chapter
 ipcMain.handle('get-chapter-page-status', async (_, chapterPath: string) => {
     try {
-        const rawFiles = await fs.readdir(path.join(chapterPath, 'Raws'));
+        const rawFiles = (await fs.readdir(path.join(chapterPath, 'Raws')))
+            .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
+            .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
         const cleanedFiles = new Set(await fs.readdir(path.join(chapterPath, 'Raws Cleaned')));
-        const initialTypesetFiles = await fs.readdir(path.join(chapterPath, 'Typesetted'));
+        // ▼▼▼ THIS IS THE CORRECTED LINE ▼▼▼
+        const typesetFiles = new Set(await fs.readdir(path.join(chapterPath, 'Typesetted')));
+        // ▲▲▲ END OF CORRECTION ▲▲▲
         const statusData = await getChapterStatus(chapterPath);
 
-        const typesetFiles = new Set<string>();
-        for (const file of initialTypesetFiles) {
-            const spreadMatch = file.match(/^(\d+)-(\d+)\..+$/);
-            if (spreadMatch) {
-                const start = parseInt(spreadMatch[1], 10);
-                const end = parseInt(spreadMatch[2], 10);
-                for (let i = start; i <= end; i++) {
-                    const pageNumberStr = i.toString();
-                    // Find the corresponding raw file to add to the set
-                    const correspondingRaw = rawFiles.find(raw => 
-                        raw.replace(/[^0-9]/g, '').includes(pageNumberStr)
-                    );
-                    if (correspondingRaw) {
-                        typesetFiles.add(correspondingRaw);
+        let finalPages = rawFiles.map(pageFile => ({
+            fileName: pageFile,
+            status: {
+                CL: cleanedFiles.has(pageFile),
+                TS: typesetFiles.has(pageFile), // Now this will work correctly
+                TL: (statusData[pageFile] || {}).TL || false,
+                PR: (statusData[pageFile] || {}).PR || false,
+                QC: (statusData[pageFile] || {}).QC || false,
+            }
+        }));
+
+        const typesetSpreads = Array.from(typesetFiles).filter(f => /^\d+[-_]\d+\..+$/.test(f as string));
+
+        for (const spreadFile of typesetSpreads) {
+            const spreadMatch = (spreadFile as string).match(/(\d+)[-_](\d+)\..+/);
+            if (!spreadMatch) continue;
+
+            const pageNum1 = spreadMatch[1].padStart(2, '0');
+            const pageNum2 = spreadMatch[2].padStart(2, '0');
+
+            const firstPageIndex = finalPages.findIndex(p => p.fileName.startsWith(pageNum1));
+            
+            if (firstPageIndex !== -1) {
+                finalPages = finalPages.filter(p => !p.fileName.startsWith(pageNum1) && !p.fileName.startsWith(pageNum2));
+
+                const spreadPageEntry = {
+                    fileName: spreadFile as string,
+                    status: {
+                        CL: true,
+                        TS: true,
+                        TL: true,
+                        PR: (statusData[spreadFile] || {}).PR || false,
+                        QC: (statusData[spreadFile] || {}).QC || false,
                     }
-                }
-            } else {
-                typesetFiles.add(file);
+                };
+                
+                finalPages.splice(firstPageIndex, 0, spreadPageEntry);
             }
         }
 
-        const pages = rawFiles
-            .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
-            .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-            .map(pageFile => {
-                const pageStatus = statusData[pageFile] || {};
-                return {
-                    fileName: pageFile,
-                    status: {
-                        CL: cleanedFiles.has(pageFile),
-                        TS: typesetFiles.has(pageFile),
-                        TL: pageStatus.TL || false,
-                        PR: pageStatus.PR || false,
-                        QC: pageStatus.QC || false,
-                    }
-                };
-        });
-        return { success: true, pages };
+        return { success: true, pages: finalPages };
     } catch (error) {
+        console.error('Error Loading Pages:', error);
         dialog.showErrorBox('Error Loading Pages', `Could not read page folders. Error: ${error.message}`);
         return { success: false, pages: [] };
     }
@@ -871,9 +1010,13 @@ ipcMain.handle('get-file-content', async (_, filePath: string) => {
 ipcMain.handle('get-json-content', async (_, filePath: string) => {
     if (!await fs.pathExists(filePath)) return null;
     const content = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(content);
+    try {
+        return JSON.parse(content);
+    } catch (error) {
+        console.error(`Failed to parse JSON from ${filePath}:`, error);
+        return null; // Return null if file is corrupted
+    }
 });
-
 // Saves translation text and drawing data
 
 // --- REPLACE WITH THIS UPDATED VERSION ---
@@ -1080,6 +1223,8 @@ async function updateAllRepositories() {
 const createWindow = (): BrowserWindow => {
   const mainWindow = new BrowserWindow({
     ...lastWindowBounds,
+    minWidth: 1100,
+    minHeight: 720,
     show: false, // The main window will start hidden
     backgroundColor: '#23272a',
     webPreferences: {

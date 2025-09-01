@@ -4,8 +4,18 @@
     <meta charset="UTF-8" />
     <title>Chapters</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        margin: 0; background-color: #23272a; color: #ffffff; }
+        * { box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0; 
+            background-color: #23272a; 
+            color: #ffffff;
+            overflow: hidden;
+            background-color: #1e2124;
+            background-image: linear-gradient(to top, #1e2124, #282b30);
+            background-repeat: no-repeat;
+            height: 100vh;
+        }
         .header { display: flex; justify-content: space-between;
         align-items: center; padding: 16px 24px; background-color: #2c2f33; border-bottom: 1px solid #4a4d52;
         }
@@ -55,11 +65,87 @@
         }
 
         .header-right { display: flex; align-items: center; gap: 10px; }
-        .action-btn { background-color: #43b581; color: white; padding: 8px 16px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .action-btn { transition: transform 0.1s, background-color 0.2s; transition: background-color 0.2s; display: flex; align-items: center; gap: 8px; background-color: #43b581; color: white; padding: 8px 16px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .action-btn svg {
+            width: 18px; /* Sets the icon size */
+            height: 18px;
+            fill: white; /* Makes the icon white */
+        }
+
+        .action-btn:active {
+            /* Make the button look "pressed" */
+            transform: translateY(1px);
+        }
         .header-icon-btn { display: flex; align-items: center; justify-content: center; }
-        .chapter-workspace { display: flex; height: calc(100vh - 65px); }
-        .main-view { flex-grow: 1; padding: 24px; display: flex; justify-content: center; align-items: center; color: #99aab5; overflow-x: hidden; }
-        #pages-sidebar { width: 300px; background-color: #2c2f33; padding: 15px; border-left: 1px solid #4a4d52; overflow-y: auto; }
+        .chapter-workspace {
+            display: flex;
+            /* This change ensures the container's height is fixed and doesn't change unexpectedly */
+            height: calc(100vh - 65px); 
+        }
+        
+        
+        #translate-btn { background-color: #7289da; } /* Pastel Blue/Purple */
+        #proofread-btn { background-color: #43b581; } /* Pastel Green */
+        #typeset-btn { background-color: #faa61a; } /* Pastel Orange */
+
+        #translate-btn:hover { background-color: #677bc4; }
+        #proofread-btn:hover { background-color: #3aa171; }
+        #typeset-btn:hover { background-color: #e0930a; }
+
+        .main-view { flex-grow: 1; padding: 24px; display: flex; justify-content: center; align-items: center; color: #99aab5; overflow-x: hidden; min-height: 0; margin-right: 40px; }
+        #pages-sidebar {
+            position: absolute; /* Positions the sidebar relative to the new container. */
+            top: 0;
+            right: -300px; /* Hides the sidebar completely off-screen. */
+            width: 300px;
+            height: 100%;
+            background-color: #2c2f33;
+            padding: 15px;
+            border-left: 1px solid #4a4d52;
+            overflow-y: auto;
+            transition: right 0.3s ease-in-out;
+            /* Re-enable pointer events for the sidebar itself. */
+            pointer-events: auto;
+        }
+        #pages-sidebar.expanded {
+            right: 0; /* Slides the sidebar into view when the 'expanded' class is added. */
+        }
+
+        .sidebar-container {
+            position: fixed; /* Positions the container relative to the viewport. */
+            top: 65px; /* Aligns it below the header. */
+            right: 0; /* Aligns it to the right edge of the screen. */
+            height: calc(100vh - 65px);
+            /* This container only responds to mouse events on its visible parts. */
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+
+        .sidebar-peek-icon {
+            position: absolute; /* Positions the icon relative to the container. */
+            top: 50%;
+            /* Positions the icon just to the left of the hidden sidebar. */
+            right: 10px; 
+            transform: translateY(-50%);
+            width: 30px;
+            height: 30px;
+            fill: #99aab5;
+            opacity: 0.5;
+            transition: opacity 0.2s ease-in-out;
+            /* Enable pointer events so the icon is hoverable. */
+            pointer-events: auto; 
+            cursor: pointer;
+            
+        }
+        .sidebar-peek-icon:hover {
+            opacity: 1.0;
+        }
+
+        .sidebar-container:hover #pages-sidebar {
+            right: 0;
+        }
+
         .sidebar-header { margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 1px solid #4a4d52; }
         #page-list { display: flex; flex-direction: column; gap: 10px; }
         .page-status-item { display: flex; align-items: center; justify-content: space-between; background-color: #23272a; padding: 8px 12px; border-radius: 4px; }
@@ -106,7 +192,9 @@
             display: flex;
             gap: 15px;
             flex-grow: 1;
-            overflow: hidden;
+            
+            min-height: 0;
+            margin-bottom: 15px;
         }
         .image-viewer-side {
             width: 50%;
@@ -124,8 +212,8 @@
         }
         .proofread-layout-new .tools-panel {
             width: 100%;
-            height: 150px; /* Give the text box a fixed height */
-            flex-shrink: 0;
+            max-height: 350px;
+            margin-top: 10px;
         }
         .image-label {
             font-size: 12px;
@@ -245,28 +333,89 @@
         .heal-btn svg {
             fill: white; /* Ensure the SVG icon is white for contrast */
         }
+
+        #pages-sidebar::-webkit-scrollbar-thumb {
+            background-color: #4a4d52; /* A dark grey for the handle */
+            border-radius: 10px; /* Rounds the corners of the handle */
+            border: 3px solid #2c2f33; /* Creates a small border around the handle, using the sidebar's background color */
+        }
+
+        /* This styles the track that the scrollbar handle moves along */
+        #pages-sidebar::-webkit-scrollbar-track {
+            background: transparent; /* Makes the track invisible */
+        }
+
+        /* This styles the width of the entire scrollbar */
+        #pages-sidebar::-webkit-scrollbar {
+            width: 12px; /* Sets a comfortable width */
+        }
+
+        /* This adds a hover effect to the scrollbar handle */
+        #pages-sidebar::-webkit-scrollbar-thumb:hover {
+            background-color: #7289da; /* Changes color on hover to your app's primary accent color */
+        }
+
+        .header-left {
+            flex-grow: 1; /* Allows the left side to grow */
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        #view-title-header {
+            margin: 0 auto; /* Magically centers the title span */
+        }
+        .gallery-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            padding-top: 15px;
+            margin-top: 15px;
+            border-top: 1px solid #4a4d52;
+        }
+        .page-indicator {
+            font-size: 14px;
+            color: #99aab5;
+            font-weight: bold;
+            margin: 0 auto; /* Centers the page counter in the footer */
+        }
     </style>
 </head>
 <body>
-
     <div class="header">
         <div class="header-left">
             <a href="#" id="back-to-projects-btn" class="back-btn">&larr;</a>
-            <h1 id="project-name-header"></h1>
-                <a href="#" id="open-folder-btn" class="header-icon-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="24px" height="24px"><path d="M10 4H4c-1.11 0-2 .89-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8c0-1.11-.9-2-2-2h-8l-2-2z"/></svg>
+            
+            <a href="#" id="open-folder-btn" class="header-icon-btn" title="Open Chapter Folder">
+                <svg xmlns="http://www.w.org/2000/svg" fill="white" width="24px" height="24px" viewBox="0 0 24 24"><path d="M10 4H4c-1.11 0-2 .89-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8c0-1.11-.9-2-2-2h-8l-2-2z"/></svg>
             </a>
-            <a href="#" id="heal-folders-btn" class="header-icon-btn heal-btn" title="Heal Folders">
-                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="white"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15H9v-2h2v2zm0-4H9V7h2v6zm4-2h-2v4h2v-4z"/></svg>
+            <a href="#" id="home-btn" class="header-icon-btn" title="Go to Dashboard">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="white"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5z"/></svg>
             </a>
-            <a href="#" id="home-btn" class="header-icon-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="white"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5z"/></svg>
-             </a>
+            
+            <a href="#" id="heal-folders-btn" class="header-icon-btn" title="Heal Folders">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="white"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 11h-4v4h-4v-4H6v-4h4V6h4v4h4v4z"/></svg>
+            </a>
+            <a href="#" id="utilities-btn" class="header-icon-btn" title="Utilities">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="white"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
+            </a>
+
+            <span id="view-title-header" style="font-weight: bold; color: #99aab5;"></span>
         </div>
+
         <div class="header-right">
-            <button id="translate-btn" class="action-btn">Translate</button>
-            <button id="proofread-btn" class="action-btn">Proofread</button>
-            <button id="typeset-btn" class="action-btn">Typeset</button>
+            <button id="translate-btn" class="action-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>
+                <span>Translate</span>
+            </button>
+            <button id="proofread-btn" class="action-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 13c-3.04 0-5.5-2.46-5.5-5.5S8.96 6.5 12 6.5 17.5 8.96 17.5 12 15.04 17.5 12 17.5zm0-9C10.07 8.5 8.5 10.07 8.5 12s1.57 3.5 3.5 3.5 3.5-1.57 3.5-3.5S13.93 8.5 12 8.5z"/></svg>
+                <span>Proofread</span>
+            </button>
+            <button id="typeset-btn" class="action-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.4 16.6 4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0 4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
+                <span>Typeset</span>
+            </button>
         </div>
     </div>
 
@@ -275,10 +424,34 @@
             <div id="gallery-view-container" style="display: none;"></div>
             <p id="workspace-placeholder">Select an action like "Translate" or click a page to begin.</p>
         </div>
-        <div id="pages-sidebar">
-            <h3 class="sidebar-header">Pages</h3>
-            <div id="page-list">
-                </div>
+        <div class="sidebar-container">
+            <svg class="sidebar-peek-icon" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#FFFFFF">
+                <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+            </svg>
+            <div id="pages-sidebar">
+                <h3 class="sidebar-header">Pages</h3>
+                <div id="page-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="rename-utility-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="text-align: left; max-width: 400px;">
+            <h2 style="text-align: center;">Rename Files Utility</h2>
+            <p style="color: #99aab5; line-height: 1.5; text-align: center;">This will rename all image files in a folder sequentially starting from "01".</p>
+            <div class="form-group">
+                <label for="rename-folder-select" style="font-weight: bold; margin-bottom: 8px; display: block;">Select Folder to Rename:</label>
+                <select id="rename-folder-select" class="path-input" style="width: 100%; padding: 8px; font-size: 14px;">
+                    <option value="Raws">Raws</option>
+                    <option value="Raws Cleaned">Raws Cleaned</option>
+                    <option value="Typesetted">Typesetted</option>
+                    <option value="Final">Final</option>
+                </select>
+            </div>
+            <div class="modal-buttons" style="margin-top: 20px;">
+                <button id="rename-cancel-btn" style="background-color: #4a4d52; color: white;">Cancel</button>
+                <button id="rename-confirm-btn" style="background-color: #43b581; color: white;">Rename Files</button>
+            </div>
         </div>
     </div>
 </body>

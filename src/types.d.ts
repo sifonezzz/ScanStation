@@ -26,6 +26,11 @@ export interface IScanstationAPI {
   saveProofreadData: (data: any) => Promise<{ success: boolean; newStatus: any; error?: string }>;
   markPageCorrect: (data: any) => Promise<{ success: boolean; newStatus: any; error?: string }>;
   openFileInEditor: (data: { editor: Editor; filePath: string }) => Promise<{ success: boolean; error?: string }>;
+  getStitchedRawSpread: (data: { chapterPath: string; pageFile: string; }) => Promise<{ success: boolean; filePath?: string; error?: string; }>;
+  startWatchingChapter: (chapterPath: string) => void;
+  stopWatchingChapter: () => void;
+  onFileAdded: (callback: () => void) => void;
+  renameFilesInFolder: (data: { chapterPath: string; folderName: string; }) => Promise<{ success: boolean; message: string; }>; 
   // Settings Window
   openSettingsWindow: () => void;
   closeSettingsWindow: () => void;
@@ -68,8 +73,8 @@ export interface IScanstationAPI {
   gitStatus: (repoName: string) => Promise<any>;
   gitCommit: (repoName: string, message: string) => Promise<any>;
   gitPush: (repoName: string) => Promise<any>;
-  gitPull: (repoName: string) => Promise<{ success: boolean; message?: string }>;
-  gitSyncRepository: (repoName: string) => Promise<{ success: boolean; message?: string }>;
+  gitPull: (repoName: string) => Promise<{ success: boolean; message?: string; conflict?: boolean; files?: string[] }>;  gitSyncRepository: (repoName: string) => Promise<{ success: boolean; message?: string; conflict?: boolean; files?: string[] }>;
+  resolveConflictForcePush: (repoName: string) => Promise<{ success: boolean; message: string }>;
   // Universal APIs
   selectCoverImage: () => void;
   openExternalLink: (url: string) => void;
@@ -77,6 +82,7 @@ export interface IScanstationAPI {
   setGitIdentity: (data: { name: string; email: string; }) => Promise<{ success: boolean; error?: string }>;
   onCoverImageSelected: (callback: (path: string) => void) => void;
   createDesktopShortcut: () => Promise<{ success: boolean; error?: string }>;
+  getAppVersion: () => Promise<string>;
 }
 
 // This is the new part that fixes the errors

@@ -9,6 +9,47 @@ let currentRepositories: string[] = [];
 let selectedRepository: string | null = null;
 let hasPat = false;
 
+const spinnerSVG = `<svg class="spinner" viewBox="0 0 50 50"><circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle></svg>`;
+
+function setButtonLoadingState(button: HTMLButtonElement, isLoading: boolean, originalText: string) {
+    if (isLoading) {
+        button.innerHTML = spinnerSVG;
+        button.disabled = true;
+    } else {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+async function updateStatusBar() {
+    const versionStatus = document.getElementById('app-version-status');
+    const gitStatusIndicator = document.getElementById('git-status-indicator');
+    const lastSyncStatus = document.getElementById('last-sync-status');
+
+    if (versionStatus) {
+        versionStatus.textContent = `v${await window.api.getAppVersion()}`;
+    }
+
+    if (selectedRepository && gitStatusIndicator) {
+        try {
+            const status = await window.api.gitStatus(selectedRepository);
+            if (status.isClean) {
+                gitStatusIndicator.textContent = '✅ Up to date';
+            } else {
+                gitStatusIndicator.textContent = `⚠️ ${status.files.length} changes to commit`;
+            }
+        } catch (e) {
+            gitStatusIndicator.textContent = '❌ Error';
+        }
+    }
+    
+    // Note: Tracking last sync time requires more complex state management.
+    // This is a placeholder for now.
+    if (lastSyncStatus) {
+        lastSyncStatus.textContent = '';
+    }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   // --- Screen Containers ---
   const projectScreen = document.getElementById('project-screen');
@@ -91,21 +132,33 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   pushRepoBtn.addEventListener('click', async () => {
-    if (!selectedRepository) {
-        alert('Please select a repository to sync.');
-        return;
-    }
-    const originalText = pushRepoBtn.textContent;
-    pushRepoBtn.textContent = 'Syncing...';
-    pushRepoBtn.setAttribute('disabled', 'true');
+    if (!selectedRepository) { /* ... */ return; }
+    const originalText = 'Push Repository';
+    setButtonLoadingState(pushRepoBtn as HTMLButtonElement, true, originalText);
+    
     try {
         const result = await window.api.gitSyncRepository(selectedRepository);
-        alert(result.message);
+        
+        if (result.conflict) {
+            // Ask the user what to do
+            const userChoice = confirm(`Conflict detected in: ${result.files.join(', ')}\n\nWould you like to force push and replace the file(s) on the repository with your local version?\n\nWARNING: This cannot be undone. It is recommended to discuss this with the person who modified the file to decide which version to keep.`);
+
+            if (userChoice) {
+                // If they confirm, call the new force push handler
+                const forcePushResult = await window.api.resolveConflictForcePush(selectedRepository);
+                alert(forcePushResult.message);
+            } else {
+                alert('Sync cancelled. Please resolve the conflict manually or contact your collaborator.');
+            }
+        } else {
+            alert(result.message);
+        }
+
     } catch (error) {
         alert(`Failed to sync repository: ${error.message}`);
-     } finally {
-        pushRepoBtn.textContent = originalText;
-        pushRepoBtn.removeAttribute('disabled');
+    } finally {
+        setButtonLoadingState(pushRepoBtn as HTMLButtonElement, false, originalText);
+        updateStatusBar();
     }
   });
 
@@ -114,18 +167,28 @@ window.addEventListener('DOMContentLoaded', () => {
         alert('Please select a repository to pull from.');
         return;
     }
-    const originalText = pullRepoBtn.textContent;
-    pullRepoBtn.textContent = 'Pulling...';
-    pullRepoBtn.setAttribute('disabled', 'true');
+    const originalText = 'Pull Repository';
+    setButtonLoadingState(pullRepoBtn as HTMLButtonElement, true, originalText);
+
     try {
         const result = await window.api.gitPull(selectedRepository);
-        alert(result.message);
-        window.api.loadProjects(selectedRepository);
+        
+        // ▼▼▼ THIS IS THE CORRECTED LOGIC ▼▼▼
+        if (result.conflict) {
+            // A conflict occurred, show a detailed message.
+            alert(`A merge conflict occurred in the following files: ${result.files.join(', ')}\n\nPlease resolve these conflicts outside of the app using a Git client or by discussing with your collaborators.`);
+        } else {
+            // No conflict, show the success message.
+            alert(result.message);
+            window.api.loadProjects(selectedRepository);
+        }
+        // ▲▲▲ END OF CORRECTION ▲▲▲
+
     } catch (error) {
          alert(`Failed to pull repository: ${error.message}`);
     } finally {
-        pullRepoBtn.textContent = originalText;
-        pullRepoBtn.removeAttribute('disabled');
+        setButtonLoadingState(pullRepoBtn as HTMLButtonElement, false, originalText);
+        updateStatusBar();
     }
   });
 
@@ -237,6 +300,7 @@ async function initializeProjectView() {
     } else {
         projectGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">Please add a repository and select it to get started!</p>`;
     }
+    updateStatusBar();
 }
 
 function updateRepoDropdown() {

@@ -1,8 +1,4 @@
-
 import type { IScanstationAPI, Editor } from './types';
-
-
-
 import translateViewHtml from './translate-view.html';
 import proofreadViewHtml from './proofread-view.html';
 import typesetViewHtml from './typeset-view.html';
@@ -20,89 +16,148 @@ let activeView: {
   saveData: () => Promise<void>;
   onKeydown?: (e: KeyboardEvent) => void;
 } = { name: 'none', saveData: async () => {} };
-let projectNameHeader: HTMLElement, backBtn: HTMLElement, openFolderBtn: HTMLElement, healFoldersBtn: HTMLElement, homeBtn: HTMLElement, translateBtn: HTMLElement, proofreadBtn: HTMLElement, typesetBtn: HTMLElement, galleryViewContainer: HTMLElement, workspacePlaceholder: HTMLElement, pageListDiv: HTMLElement;
-let notificationBar: HTMLElement;
-// --- Main Setup ---
-window.addEventListener('DOMContentLoaded', () => {
-  projectNameHeader = document.getElementById('project-name-header');
-  backBtn = document.getElementById('back-to-projects-btn');
-  openFolderBtn = document.getElementById('open-folder-btn');
-  healFoldersBtn = document.getElementById('heal-folders-btn');
-  homeBtn = document.getElementById('home-btn');
-  translateBtn = document.getElementById('translate-btn');
-  proofreadBtn = document.getElementById('proofread-btn');
-  typesetBtn = document.getElementById('typeset-btn');
-  galleryViewContainer = document.getElementById('gallery-view-container');
-  workspacePlaceholder = document.getElementById('workspace-placeholder');
-  pageListDiv = document.getElementById('page-list');
 
-  window.api.onProjectDataForChapterScreen(async (data) => {
-    currentRepoName = data.repoName;
-    currentProjectName = data.projectName;
-    projectNameHeader.textContent = `${data.projectName} / ${data.chapterName}`;
-    currentChapterPath = data.chapterPath;
-    await loadAndRenderPageStatus();
-    showHomeView(); // Show dashboard on load
-  });
+// Declare variables here
+let projectNameHeader: HTMLElement, backBtn: HTMLElement, openFolderBtn: HTMLElement, healFoldersBtn: HTMLElement, homeBtn: HTMLElement, translateBtn: HTMLElement, proofreadBtn: HTMLElement, typesetBtn: HTMLElement, galleryViewContainer: HTMLElement, workspacePlaceholder: HTMLElement, pageListDiv: HTMLElement;
+let viewTitleHeader: HTMLElement;
+
+window.addEventListener('DOMContentLoaded', () => {
+    // Assign elements here, after the DOM has loaded
+    projectNameHeader = document.getElementById('project-name-header');
+    backBtn = document.getElementById('back-to-projects-btn');
+    openFolderBtn = document.getElementById('open-folder-btn');
+    healFoldersBtn = document.getElementById('heal-folders-btn');
+    homeBtn = document.getElementById('home-btn');
+    translateBtn = document.getElementById('translate-btn');
+    proofreadBtn = document.getElementById('proofread-btn');
+    typesetBtn = document.getElementById('typeset-btn');
+    galleryViewContainer = document.getElementById('gallery-view-container');
+    workspacePlaceholder = document.getElementById('workspace-placeholder');
+    pageListDiv = document.getElementById('page-list');
+    viewTitleHeader = document.getElementById('view-title-header');
+
+    const sidebar = document.getElementById('pages-sidebar');
+    if (sidebar) {
+        sidebar.addEventListener('mouseenter', () => {
+            sidebar.classList.add('expanded');
+        });
+        sidebar.addEventListener('mouseleave', () => {
+            sidebar.classList.remove('expanded');
+        });
+    }
+
+    window.api.onProjectDataForChapterScreen(async (data) => {
+        currentRepoName = data.repoName;
+        currentProjectName = data.projectName;
+        currentChapterPath = data.chapterPath;
+        await loadAndRenderPageStatus();
+        showHomeView();
+        window.api.startWatchingChapter(currentChapterPath);
+    });
+
+    window.api.onFileAdded(() => {
+        console.log('File change detected, refreshing sidebar.');
+        loadAndRenderPageStatus();
+    });
+    
+    openFolderBtn.addEventListener('click', (e) => { 
+        e.preventDefault(); 
+        if (currentChapterPath) window.api.openChapterFolder(currentChapterPath); 
+    });
+
+    healFoldersBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (currentChapterPath) {
+            window.api.healChapterFolders(currentChapterPath);
+        }
+    });
 
     window.api.onHealFoldersComplete(async (result) => {
         if (result.success) {
             console.log('Folders healed. Refreshing page list.');
-            await loadAndRenderPageStatus(); // Reload the sidebar
+            await loadAndRenderPageStatus();
         }
     });
-  
-  healFoldersBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    if (currentChapterPath) {
-        // We no longer await this, as the reply will trigger the refresh
-        window.api.healChapterFolders(currentChapterPath);
-    }
-  });
 
-  backBtn.addEventListener('click', (e) => { e.preventDefault(); window.api.goBackToProjects(currentRepoName, currentProjectName); });
-  openFolderBtn.addEventListener('click', (e) => { e.preventDefault(); if (currentChapterPath) window.api.openChapterFolder(currentChapterPath); });
+    backBtn.addEventListener('click', (e) => { 
+        e.preventDefault(); 
+        window.api.stopWatchingChapter();
+        window.api.goBackToProjects(currentRepoName, currentProjectName); 
+    });
   
-  homeBtn.addEventListener('click', async (e) => {
-    e.preventDefault();
-    await activeView.saveData();
-    showHomeView();
-  });
-  translateBtn.addEventListener('click', async () => {
-    await activeView.saveData();
-    showTranslateView(0);
-  });
-  proofreadBtn.addEventListener('click', async () => {
-    await activeView.saveData();
-    const firstAnnotatedPage = pages.findIndex(p => p.status.PR === 'annotated');
-    showProofreadView(firstAnnotatedPage >= 0 ? firstAnnotatedPage : 0);
-  });
-  typesetBtn.addEventListener('click', async () => {
-    await activeView.saveData();
-    showTypesetView(0);
-  });
-  window.addEventListener('keydown', (e) => {
-    if (activeView.onKeydown) {
-      activeView.onKeydown(e);
+    homeBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await activeView.saveData();
+        showHomeView();
+    });
+
+    translateBtn.addEventListener('click', async () => {
+        await activeView.saveData();
+        showTranslateView(0);
+    });
+
+    proofreadBtn.addEventListener('click', async () => {
+        await activeView.saveData();
+        document.body.style.cursor = 'wait';
+        const spreadPages = pages.filter(p => /^\d+[-_]\d+\..+$/.test(p.fileName));
+        for (const spread of spreadPages) {
+            window.api.getStitchedRawSpread({
+                chapterPath: currentChapterPath,
+                pageFile: spread.fileName
+            });
+        }
+        const firstAnnotatedPage = pages.findIndex(p => p.status.PR === 'annotated');
+        showProofreadView(firstAnnotatedPage >= 0 ? firstAnnotatedPage : 0);
+        document.body.style.cursor = 'default';
+    });
+
+    typesetBtn.addEventListener('click', async () => {
+        await activeView.saveData();
+        showTypesetView(0);
+    });
+
+    window.addEventListener('keydown', (e) => {
+        if (activeView.onKeydown) {
+            activeView.onKeydown(e);
+        }
+    });
+
+    // --- RENAME UTILITY LOGIC ---
+    const utilitiesBtn = document.getElementById('utilities-btn');
+    const renameModal = document.getElementById('rename-utility-modal');
+    const renameCancelBtn = document.getElementById('rename-cancel-btn');
+    const renameConfirmBtn = document.getElementById('rename-confirm-btn');
+    const folderSelect = document.getElementById('rename-folder-select') as HTMLSelectElement;
+
+    if (utilitiesBtn && renameModal) {
+        utilitiesBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            renameModal.style.display = 'flex';
+        });
+
+        renameCancelBtn.addEventListener('click', () => {
+            renameModal.style.display = 'none';
+        });
+
+        renameConfirmBtn.addEventListener('click', async () => {
+            const folderName = folderSelect.value;
+            const confirmRename = confirm(`Are you sure you want to rename all image files in the "${folderName}" folder? This cannot be undone.`);
+            
+            if (confirmRename && currentChapterPath) {
+                const result = await window.api.renameFilesInFolder({ chapterPath: currentChapterPath, folderName });
+                alert(result.message);
+                if (result.success) {
+                    renameModal.style.display = 'none';
+                }
+            }
+        });
     }
-  });
 });
 
-// --- Core Sidebar/Status & View Loading ---
 async function loadAndRenderPageStatus() {
   if (!currentChapterPath) return;
   const result = await window.api.getChapterPageStatus(currentChapterPath);
   if (result.success) { pages = result.pages; renderSidebar(); }
-}
-
-function showNotification(message: string, duration = 3000) {
-    if (!notificationBar) return;
-    notificationBar.textContent = message;
-    notificationBar.style.top = '0px'; // Slide it down
-
-    setTimeout(() => {
-        notificationBar.style.top = '-50px'; // Slide it back up
-    }, duration);
 }
 
 function renderSidebar() {
@@ -132,6 +187,7 @@ function showHomeView() {
     galleryViewContainer.style.display = 'none';
     galleryViewContainer.innerHTML = '';
     workspacePlaceholder.style.display = 'flex';
+    viewTitleHeader.textContent = '';
     activeView = { name: 'home', saveData: async () => {} };
     if (pages.length === 0) {
         workspacePlaceholder.innerHTML = 'No pages found in "Raws" folder to generate a dashboard.';
@@ -152,6 +208,7 @@ function createProgressBar(label: string, count: number, total: number) {
 
 function showTranslateView(startingIndex: number) {
   if (pages.length === 0) { alert('There are no pages in the "Raws" folder to translate.'); return; }
+  viewTitleHeader.textContent = '— Translation Mode';
   galleryViewContainer.innerHTML = translateViewHtml;
   workspacePlaceholder.style.display = 'none';
   galleryViewContainer.style.display = 'flex';
@@ -160,6 +217,7 @@ function showTranslateView(startingIndex: number) {
 
 function showProofreadView(startingIndex: number) {
   if (pages.length === 0) { alert('There are no pages to proofread.'); return; }
+  viewTitleHeader.textContent = '— Proofread Mode';
   galleryViewContainer.innerHTML = proofreadViewHtml;
   workspacePlaceholder.style.display = 'none';
   galleryViewContainer.style.display = 'flex';
@@ -168,6 +226,7 @@ function showProofreadView(startingIndex: number) {
 
 function showTypesetView(startingIndex: number) {
   if (pages.length === 0) { alert('There are no pages to typeset.'); return; }
+  viewTitleHeader.textContent = '— Typesetting Mode';
   galleryViewContainer.innerHTML = typesetViewHtml;
   workspacePlaceholder.style.display = 'none';
   galleryViewContainer.style.display = 'flex';
@@ -183,7 +242,6 @@ function initTranslateView(startingIndex: number) {
   const translationText = document.getElementById('translation-text') as HTMLTextAreaElement;
   const nextBtn = document.getElementById('translate-next-btn') as HTMLButtonElement;
   const prevBtn = document.getElementById('translate-prev-btn') as HTMLButtonElement;
-  const closeBtn = document.querySelector('.gallery-close-btn') as HTMLAnchorElement;
   const canvas = document.getElementById('drawing-canvas') as HTMLCanvasElement;
   const ctx = canvas.getContext('2d');
   let isDrawing = false;
@@ -285,7 +343,6 @@ function initTranslateView(startingIndex: number) {
   };
 
   const getMousePos = (e: MouseEvent) => ({ x: (e.clientX - canvas.getBoundingClientRect().left), y: (e.clientY - canvas.getBoundingClientRect().top) });
-  closeBtn.addEventListener('click', async (e) => { e.preventDefault(); await saveData(); showHomeView(); });
   nextBtn.addEventListener('click', () => loadPage(currentPageIndex + 1));
   prevBtn.addEventListener('click', () => loadPage(currentPageIndex - 1));
   rawImage.onload = redrawCanvas;
@@ -310,7 +367,6 @@ function initProofreadView(startingIndex: number) {
   const nextBtn = document.getElementById('proofread-next-btn') as HTMLButtonElement;
   const prevBtn = document.getElementById('proofread-prev-btn') as HTMLButtonElement;
   const correctBtn = document.getElementById('proofread-correct-btn') as HTMLButtonElement;
-  const closeBtn = document.querySelector('.gallery-close-btn') as HTMLAnchorElement;
 
   saveBtn.addEventListener('click', async () => {
       const originalText = saveBtn.textContent;
@@ -349,19 +405,40 @@ function initProofreadView(startingIndex: number) {
     currentPageIndex = index;
     const page = pages[currentPageIndex];
     pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
-    const rawPath = `${currentChapterPath}/Raws/${page.fileName}`.replace(/\\/g, '/');
-    rawImage.src = `scanstation-asset:///${rawPath}`;
+
+    // The backend now tells us if it's a spread by using a filename like "14-15.jpg"
+    const isSpread = /^\d+[-_]\d+\..+$/.test(page.fileName);
+    
+    if (isSpread) {
+        // It's a spread, so we call the stitching function
+        const result = await window.api.getStitchedRawSpread({
+            chapterPath: currentChapterPath,
+            pageFile: page.fileName
+        });
+        if (result.success) {
+            rawImage.src = `scanstation-asset:///${result.filePath.replace(/\\/g, '/')}?t=${Date.now()}`;
+        } else {
+            rawImage.src = ''; 
+            console.error('Failed to load spread:', result.error);
+        }
+    } else {
+        // It's a single page, load the raw as usual
+        const rawPath = `${currentChapterPath}/Raws/${page.fileName}`.replace(/\\/g, '/');
+        rawImage.src = `scanstation-asset:///${rawPath}`;
+    }
+    
+    // Load the typeset image (which could be a spread or a single)
     const tsPath = `${currentChapterPath}/Typesetted/${page.fileName}`.replace(/\\/g, '/');
-    tsImage.src = `scanstation-asset:///${tsPath}`;
+    tsImage.src = `scanstation-asset:///${tsPath}?t=${Date.now()}`;
     tsImage.onerror = () => { tsImage.src = ''; };
+
     const annotations = await window.api.getFileContent(`${currentChapterPath}/data/PR Data/${page.fileName}_proof.txt`);
     annotationsText.value = annotations;
   };
 
-  closeBtn.addEventListener('click', async (e) => { e.preventDefault(); await saveAnnotations(); showHomeView(); });
   nextBtn.addEventListener('click', () => loadPage(currentPageIndex + 1));
   prevBtn.addEventListener('click', () => loadPage(currentPageIndex - 1));
-  
+
   correctBtn.addEventListener('click', async () => {
     await saveAnnotations();
     const pageFile = pages[currentPageIndex].fileName;
@@ -373,7 +450,7 @@ function initProofreadView(startingIndex: number) {
       if (currentPageIndex < pages.length - 1) { loadPage(currentPageIndex + 1); } else { showHomeView(); }
     } else {
       alert(`Could not mark page as correct: ${result.error}`);
-    }
+     }
   });
 
   loadPage(startingIndex);
@@ -388,7 +465,6 @@ function initTypesetView(startingIndex: number) {
   const translationTextDiv = document.getElementById('typeset-translation-text') as HTMLDivElement;
   const nextBtn = document.getElementById('typeset-next-btn') as HTMLButtonElement;
   const prevBtn = document.getElementById('typeset-prev-btn') as HTMLButtonElement;
-  const closeBtn = document.querySelector('.gallery-close-btn') as HTMLAnchorElement;
   const showCleanedBtn = document.getElementById('show-cleaned-btn') as HTMLButtonElement;
   const showRawBtn = document.getElementById('show-raw-btn') as HTMLButtonElement;
   
@@ -488,7 +564,6 @@ function initTypesetView(startingIndex: number) {
     updateImageView();
   });
 
-  closeBtn.addEventListener('click', (e) => { e.preventDefault(); showHomeView(); });
   nextBtn.addEventListener('click', () => loadPage(currentPageIndex + 1));
   prevBtn.addEventListener('click', () => loadPage(currentPageIndex - 1));
 

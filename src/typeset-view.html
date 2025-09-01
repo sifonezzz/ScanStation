@@ -1,8 +1,3 @@
-<div class="gallery-header">
-    <h2>Typesetting Mode</h2>
-    <span id="typeset-page-indicator">Page X of Y</span>
-    <a href="#" class="gallery-close-btn">&times;</a>
-</div>
 <div class="gallery-content typeset-layout">
     <div class="image-viewer">
         <img id="typeset-image" src="" alt="Page Image" />
@@ -18,13 +13,17 @@
         </div>
     </div>
 </div>
+
 <div class="gallery-footer">
-    <div class="image-switcher">
-        <button id="show-cleaned-btn" class="switcher-btn active">Show Cleaned</button>
-        <button id="show-raw-btn" class="switcher-btn">Show Raw</button>
-    </div>
     <div class="footer-nav-buttons">
         <button id="typeset-prev-btn">Previous</button>
         <button id="typeset-next-btn">Next</button>
+    </div>
+
+    <span class="page-indicator" id="typeset-page-indicator">Page X of Y</span>
+
+    <div class="image-switcher">
+        <button id="show-cleaned-btn" class="switcher-btn active">Show Cleaned</button>
+        <button id="show-raw-btn" class="switcher-btn">Show Raw</button>
     </div>
 </div>
