@@ -559,7 +559,6 @@ function initTypesetView(startingIndex: number) {
   const updateImageView = async () => {
     const page = pages[currentPageIndex];
     if (!page) return;
-
     const imagePath = currentImageType === 'cleaned' 
       ? `${currentChapterPath}/Raws Cleaned/${page.fileName}` 
       : `${currentChapterPath}/Raws/${page.fileName}`;
@@ -570,7 +569,8 @@ function initTypesetView(startingIndex: number) {
     
     mainImage.onerror = () => { mainImage.src = ''; };
 
-    const drawingData = await window.api.getJsonContent(`${currentChapterPath}/data/TL Data/${getBaseName(page.fileName)}_drawing.json`);
+    // THIS IS THE CORRECTED LINE: It now uses page.fileName directly
+    const drawingData = await window.api.getJsonContent(`${currentChapterPath}/data/TL Data/${page.fileName}_drawing.json`);
     
     if (mainImage.complete) {
         redrawTypesetCanvas(drawingData);
@@ -587,8 +587,8 @@ function initTypesetView(startingIndex: number) {
     pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
     
     await updateImageView();
-
-    const translatedText = await window.api.getFileContent(`${currentChapterPath}/data/TL Data/${getBaseName(page.fileName)}.txt`);
+    // THIS IS THE CORRECTED LINE: It now uses page.fileName instead of getBaseName
+    const translatedText = await window.api.getFileContent(`${currentChapterPath}/data/TL Data/${page.fileName}.txt`);
     translationTextDiv.textContent = translatedText || 'No translation text found for this page.';
   };
 
