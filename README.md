@@ -115,7 +115,7 @@ This is the main workspace for editing and tracking page progress.
 
 Add Raw Images: Place your raw manga pages into the Raws folder for the chapter you are working on. The sidebar will automatically populate with these pages.
 
-Use the Views:
+### Use the Views:
 
 Click the Translate button to open the translation view. Here, you can write the script and draw on the image to mark bubbles. Your work is saved automatically.
 
