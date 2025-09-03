@@ -53,6 +53,8 @@ function createCircleExpandAnimation(projectCard: HTMLElement, callback: () => v
     ease: 'power2.inOut',
     onComplete: () => {
       // Execute the callback (show chapter selection)
+      const projectScreen = document.getElementById('project-screen');
+      if (projectScreen) projectScreen.style.display = 'none';
       callback();
       
       // Fade out the overlay
@@ -134,26 +136,27 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- CHAPTER SCREEN LOGIC ---
-  window.api.onShowChapterSelection((data) => {
-    showChapterSelection(data.repoName, data.projectName);
-  });
-
   window.api.onChaptersLoaded((chapters) => {
     chapterGrid.innerHTML = '';
     if (chapters.length === 0) {
         chapterGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">No chapters found. Click '+ New Chapter' to get started!</p>`;
         return;
     }
+
     for (const chapter of chapters) {
         const card = document.createElement('div');
         card.className = 'chapter-card';
         card.textContent = chapter.name.replace(/_/g, ' ');
         card.addEventListener('click', () => {
-          window.api.openProject(currentRepoName, currentProjectName, chapter.name);
+            if (!isEditMode) {
+                createRectangleExpandAnimation(card, () => {
+                    window.api.openProject(currentRepoName, currentProjectName, chapter.name);
+                });
+            }
         });
         chapterGrid.appendChild(card);
     }
-  });
+});
 
   createChapterBtn.addEventListener('click', () => {
       if (currentRepoName && currentProjectName) {
@@ -166,12 +169,28 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   backBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    if (projectScreen && chapterScreen) {
+  e.preventDefault();
+  
+  const projectScreen = document.getElementById('project-screen');
+  const chapterScreen = document.getElementById('chapter-screen');
+  
+  if (projectScreen && chapterScreen) {
+    // Fade out chapter screen
+    gsap.to(chapterScreen, {
+      opacity: 0,
+      duration: 0.3,
+      onComplete: () => {
         chapterScreen.style.display = 'none';
+        // Show and fade in project screen
         projectScreen.style.display = 'block';
-    }
-  });
+        gsap.to(projectScreen, {
+          opacity: 1,
+          duration: 0.3
+        });
+      }
+    });
+  }
+    });
 
   // --- PROJECT SCREEN LOGIC ---
   editBtn.addEventListener('click', () => {
@@ -323,6 +342,59 @@ window.addEventListener('DOMContentLoaded', () => {
   checkAndSetGitIdentity();
 }); // <-- This closes the DOMContentLoaded event listener
 
+function createRectangleExpandAnimation(chapterCard: HTMLElement, callback: () => void) {
+  // Get position and dimensions of the clicked chapter card
+  const rect = chapterCard.getBoundingClientRect();
+  
+  // Create overlay with rectangle
+  const overlay = document.createElement('div');
+  overlay.style.position = 'fixed';
+  overlay.style.top = '0';
+  overlay.style.left = '0';
+  overlay.style.width = '100%';
+  overlay.style.height = '100%';
+  overlay.style.zIndex = '1000';
+  overlay.style.pointerEvents = 'none';
+  overlay.style.overflow = 'hidden';
+  
+  const rectangle = document.createElement('div');
+  rectangle.style.position = 'absolute';
+  rectangle.style.top = `${rect.top}px`;
+  rectangle.style.left = `${rect.left}px`;
+  rectangle.style.width = `${rect.width}px`;
+  rectangle.style.height = `${rect.height}px`;
+  rectangle.style.backgroundColor = '#3b3e44';
+  rectangle.style.borderRadius = '8px'; // Match the chapter card's border radius
+  
+  overlay.appendChild(rectangle);
+  document.body.appendChild(overlay);
+  
+  // Animate the rectangle expanding to cover the entire screen
+  gsap.to(rectangle, {
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    borderRadius: 0, // Remove border radius as it expands
+    duration: 0.6,
+    ease: 'power2.inOut',
+    onComplete: () => {
+      // Execute the callback (open chapter workspace)
+      callback();
+      
+      // Fade out the overlay
+      gsap.to(overlay, {
+        opacity: 0,
+        duration: 0.3,
+        delay: 0.1,
+        onComplete: () => {
+          document.body.removeChild(overlay);
+        }
+      });
+    }
+  });
+}
+
 async function checkAndSetGitIdentity() {
     const identity = await window.api.getGitIdentity();
     if (identity.name && identity.email) {
@@ -392,7 +464,7 @@ function showChapterSelection(repoName: string, projectName: string) {
   currentRepoName = repoName;
   currentProjectName = projectName;
 
-  // Get the screen containers that already exist in index.html
+  // Get the screen containers
   const projectScreen = document.getElementById('project-screen');
   const chapterScreen = document.getElementById('chapter-screen');
   
@@ -400,22 +472,35 @@ function showChapterSelection(repoName: string, projectName: string) {
   const projectNameHeader = document.getElementById('project-name-header');
   const chapterGrid = document.getElementById('chapter-grid');
 
-  // Ensure all elements were found before proceeding
   if (!projectScreen || !chapterScreen || !projectNameHeader || !chapterGrid) {
     console.error('Could not find required elements to show chapter screen.');
     return;
   }
 
-  // 1. Hide the project screen and show the chapter screen
-  projectScreen.style.display = 'none';
-  chapterScreen.style.display = 'block';
-
-  // 2. Set the header title
+  // 1. Set the header title
   projectNameHeader.textContent = projectName;
   
-  // 3. Clear the grid and show a loading message
+  // 2. Clear the grid and show a loading message
   chapterGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">Loading chapters...</p>`;
   
-  // 4. Request the chapters for the selected project
+  // 3. Request the chapters for the selected project
   window.api.getChapters(repoName, projectName);
+  
+  // 4. Show the chapter screen (it will be hidden initially for the animation)
+  chapterScreen.style.display = 'block';
+  chapterScreen.style.opacity = '0';
+  
+  // 5. Hide the project screen with a fade
+  gsap.to(projectScreen, {
+    opacity: 0,
+    duration: 0.3,
+    onComplete: () => {
+      projectScreen.style.display = 'none';
+      // Fade in the chapter screen
+      gsap.to(chapterScreen, {
+        opacity: 1,
+        duration: 0.3
+      });
+    }
+  });
 }
