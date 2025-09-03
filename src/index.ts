@@ -1,8 +1,8 @@
 import { AppStore } from './settings';
-
 import { app, BrowserWindow, ipcMain, dialog, protocol, session, shell, Menu, screen } from 'electron';
 import path from 'path';
-import fs from 'fs-extra';
+import fs from 'fs-extra'; // This stays the same for your existing code
+import * as fsPromises from 'fs/promises'; // Add this line
 import simpleGit, { SimpleGit } from 'simple-git';
 import Jimp from 'jimp';
 import { getSetting, setSetting, deleteSetting } from './settings';
@@ -27,7 +27,7 @@ declare const SETTINGS_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 declare const WELCOME_WINDOW_WEBPACK_ENTRY: string;
 declare const WELCOME_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
-
+let mainWindow: BrowserWindow;
 let createProjectWindow: BrowserWindow | null = null;
 let editProjectWindow: BrowserWindow | null = null;
 let chapterScreenWindow: BrowserWindow | null = null;
@@ -37,6 +37,7 @@ let splashWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let welcomeWindow: BrowserWindow | null = null;
 let chapterWatcher: chokidar.FSWatcher | null = null;
+let repoWatcher: chokidar.FSWatcher | null = null;
 let spreadCache = new Map<string, string>();
 
 
@@ -100,6 +101,8 @@ function openSettingsWindow() {
         }
     });
 }
+
+
 
 ipcMain.on('open-settings-window', openSettingsWindow);
 ipcMain.on('close-settings-window', () => {
@@ -262,6 +265,39 @@ ipcMain.handle('set-git-identity', async (_, { name, email }: { name: string; em
     }
 });
 
+// Helper to strip the [local] prefix for filesystem operations
+function getRepoFolderName(repoIdentifier: string): string {
+    if (repoIdentifier && repoIdentifier.startsWith('[local] ')) {
+        return repoIdentifier.substring(8);
+    }
+    return repoIdentifier;
+}
+ipcMain.handle('add-offline-repository', async (_, repoName: string) => {
+    const storagePath = getStoragePath();
+    const repoPath = path.join(storagePath, repoName); // Uses the clean name
+
+    if (await fs.pathExists(repoPath)) {
+        dialog.showErrorBox('Folder Exists', `A folder named '${repoName}' already exists.`);
+        return { success: false };
+    }
+
+    try {
+        // Creates the folder with the clean name
+        await fs.ensureDir(repoPath);
+
+        // Adds the repository to settings WITH the prefix and space
+        const identifier = `[local] ${repoName}`;
+        const currentRepos = getSetting<string[]>('repositories') || [];
+        setSetting('repositories', [...currentRepos, identifier]);
+        setSetting('selectedRepository', identifier); // Auto-selects it
+
+        return { success: true };
+    } catch (error) {
+        dialog.showErrorBox('Creation Failed', `Could not create offline repository. Error: ${error.message}`);
+        return { success: false };
+    }
+});
+
 ipcMain.handle('create-shortcut', async () => {
     try {
         const shortcutPath = path.join(app.getPath('desktop'), 'Scanstation.lnk');
@@ -297,7 +333,8 @@ async function loadProjects(mainWindow: BrowserWindow, repositoryName: string) {
     return;
   }
   
-  const repoPath = path.join(getStoragePath(), repositoryName);
+  const repoPath = path.join(getStoragePath(), getRepoFolderName(repositoryName));
+
 
   try {
     await fs.ensureDir(repoPath);
@@ -319,6 +356,46 @@ async function loadProjects(mainWindow: BrowserWindow, repositoryName: string) {
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('projects-loaded', []);
     }
+  }
+}
+
+async function healRepositoryFolders(repoPath: string): Promise<void> {
+  const requiredChapterFolders = [
+    'Raws',
+    'Raws Cleaned',
+    'Typesetted',
+    'Final',
+    'data',
+    path.join('data', 'TL Data'),
+    path.join('data', 'PR Data')
+  ];
+
+  try {
+    // Use the fsPromises alias for all file system operations
+    const projects = await fsPromises.readdir(repoPath, { withFileTypes: true }); 
+    for (const project of projects) {
+      if (!project.isDirectory()) continue;
+
+      const projectPath = path.join(repoPath, project.name);
+      const chapters = await fsPromises.readdir(projectPath, { withFileTypes: true }); 
+
+      for (const chapter of chapters) {
+        if (!chapter.isDirectory()) continue;
+
+        const chapterPath = path.join(projectPath, chapter.name);
+        for (const requiredFolder of requiredChapterFolders) {
+          const fullPath = path.join(chapterPath, requiredFolder);
+          try {
+            await fsPromises.access(fullPath); 
+          } catch {
+            await fsPromises.mkdir(fullPath, { recursive: true }); 
+            console.log(`Healed missing folder: ${fullPath}`);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Failed during repository healing process for ${repoPath}:`, error);
   }
 }
 
@@ -346,7 +423,7 @@ async function backupProjects() {
 async function refreshChapters(targetWindow: BrowserWindow, repoName: string, projectName: string) {
     if (!targetWindow || targetWindow.isDestroyed()) return;
 
-    const projectPath = path.join(getStoragePath(), repoName, projectName);
+    const projectPath = path.join(getStoragePath(), getRepoFolderName(repoName), projectName);
     try {
       const chapterFolders = await fs.readdir(projectPath, { withFileTypes: true });
       const chapters = chapterFolders
@@ -402,7 +479,7 @@ function openEditProjectWindow(repoName: string, projectName: string) {
   });
   editProjectWindow.once('ready-to-show', () => editProjectWindow.show());
   editProjectWindow.webContents.once('dom-ready', () => {
-    const coverPath = path.join(getStoragePath(), repoName, projectName, 'cover.jpg');
+    const coverPath = path.join(getStoragePath(), getRepoFolderName(repoName), projectName, 'cover.jpg');
     editProjectWindow.webContents.send('project-data-for-edit', { name: projectName, coverPath, repoName });
   });
   editProjectWindow.loadURL(EDIT_PROJECT_WINDOW_WEBPACK_ENTRY);
@@ -527,34 +604,76 @@ ipcMain.handle('open-file-in-editor', async (_, { editor, filePath }: { editor: 
 });
 
 ipcMain.handle('git-pull', async (_, repoName: string) => {
-    const repoPath = path.join(getStoragePath(), repoName);
+
+    if (repoName.startsWith('[local] ')) {
+    return { success: true, message: 'Local repositories do not need to be pulled.' };
+}
+    const repoPath = path.join(getStoragePath(), getRepoFolderName(repoName));
     const git = simpleGit(repoPath);
 
-    try {
-        const pullSummary = await git.pull();
-        if (pullSummary.files.length === 0 && pullSummary.summary.changes === 0) {
-            return { success: true, message: 'Repository is already up-to-date.' };
-        }
-        return { success: true, message: `Successfully pulled changes!\nFiles changed: ${pullSummary.summary.changes}` };
-    } catch (error) { // <-- Underscore removed
-        // Check for a merge conflict error
-        if (error.message.includes('Merge conflict')) {
-            const status = await git.status();
-            return {
-                success: false,
-                conflict: true,
-                files: status.conflicted,
-                message: 'Merge conflict detected.'
-            };
-        }
-        // Handle other potential errors
-        console.error(`Failed to pull repository ${repoName}:`, error);
-        throw error; // Rethrow for the frontend to display a generic error
+  try {
+    // A successful pull means there were no merge conflicts.
+    await git.pull();
+
+    console.log(`Pull successful for ${repoName}. Healing repository folders...`);
+    await healRepositoryFolders(repoPath);
+
+    return {
+      success: true,
+      conflict: false,
+      message: 'Repository pulled successfully.'
+    };
+
+  } catch (error) {
+    // When a conflict occurs, simple-git throws a GitResponseError.
+    // We check if the error object contains the expected conflict data.
+    if (error.git && error.git.conflicts && error.git.conflicts.length > 0) {
+      return {
+        success: true, // The operation is "successful" in that it correctly identified the conflict.
+        conflict: true,
+        files: error.git.conflicts.map((conflict: any) => conflict.file), // Extract file names from the conflict objects.
+        message: 'A merge conflict occurred.'
+      };
     }
+
+    // Handle other, unexpected errors.
+    console.error(`Git pull failed for ${repoName}:`, error);
+    return {
+      success: false,
+      message: `An error occurred while pulling the repository: ${error.message}`
+    };
+  }
 });
 
+const createWindow = (): void => {
+  mainWindow = new BrowserWindow({
+    width: 1100,
+    minWidth: 1100,
+    height: 720,
+    minHeight: 720,
+    show: false,
+    backgroundColor: '#2c2f33',
+    webPreferences: {
+      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
+      sandbox: false,
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  Menu.setApplicationMenu(null);
+  mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+
+  mainWindow.once('ready-to-show', () => {
+    const selectedRepo = getSetting<string>('selectedRepository');
+    if (selectedRepo) {
+      loadProjects(mainWindow, selectedRepo);
+    }
+  });
+};
+
 ipcMain.on('submit-project-creation', async (_, { repoName, name, path: coverPath }) => {
-  const projectPath = path.join(getStoragePath(), repoName, name);
+  const projectPath = path.join(getStoragePath(), getRepoFolderName(repoName), name);
   const projectExists = await fs.pathExists(projectPath);
   if (projectExists) {
     dialog.showErrorBox('Project Exists', `A project named "${name}" already exists.`);
@@ -601,7 +720,7 @@ ipcMain.handle('delete-project', async (_, { repoName, projectName }) => {
   });
   if (response === 1) return { success: false };
   try {
-    const projectPath = path.join(getStoragePath(), repoName, projectName);
+    const projectPath = path.join(getStoragePath(), getRepoFolderName(repoName), projectName);
     await fs.rm(projectPath, { recursive: true, force: true });
     const mainWindow = BrowserWindow.getAllWindows()[0];
     if (mainWindow) loadProjects(mainWindow, repoName);
@@ -620,7 +739,7 @@ ipcMain.on('cancel-project-update', () => {
 
 ipcMain.handle('submit-project-update', async (_, data) => {
   const { repoName, originalName, newName, newCoverPath } = data;
-  const repoPath = path.join(getStoragePath(), repoName);
+  const repoPath = path.join(getStoragePath(), getRepoFolderName(repoName));
   const originalPath = path.join(repoPath, originalName);
   const newPath = path.join(repoPath, newName);
 
@@ -743,7 +862,10 @@ ipcMain.handle('get-repositories', () => ({
 
 ipcMain.on('set-selected-repository', (event, repoName: string) => {
     setSetting('selectedRepository', repoName);
-    loadProjects(BrowserWindow.fromWebContents(event.sender), repoName);
+    const mainWindow = BrowserWindow.fromWebContents(event.sender);
+    if (mainWindow) {
+        loadProjects(mainWindow, repoName);
+    }
 });
 
 
@@ -764,14 +886,39 @@ ipcMain.handle('add-repository', async (_, repoUrl: string) => {
               dialog.showMessageBox({ title: 'Repository Exists', message: `The repository '${repoName}' has already been added.` });
           } else {
               // Folder exists but is NOT a git repo
-              dialog.showErrorBox('Invalid Folder', `A folder named '${repoName}' already exists but is not a valid Git repository.\n\nPlease manually remove this folder and try again.`);
+              dialog.showErrorBox(
+                    'Invalid Folder', // The title (first argument)
+                    `A folder named '${repoName}' already exists but is not a valid Git repository.\n\nPlease manually remove this folder from the following location and try again:\n\n${targetPath}` // The content (second argument)
+                );
               return { success: false };
           }
       } else {
           // Folder does not exist, so clone it
-          try {
-              await simpleGit().clone(authenticatedUrl, targetPath);
-          } catch (error) {
+            try {
+            // First, clone the repository
+            await simpleGit().clone(authenticatedUrl, targetPath);
+
+            const git = simpleGit(targetPath);
+            let defaultBranch = 'main'; // Start with a safe default
+
+            // Get information about the remote repository
+            const remoteInfo = await git.remote(['show', 'origin']);
+
+            // First, check if remoteInfo is a string before using .match()
+            if (typeof remoteInfo === 'string') {
+                const headBranchMatch = remoteInfo.match(/HEAD branch: (.*)/);
+                if (headBranchMatch && headBranchMatch[1]) {
+                    defaultBranch = headBranchMatch[1]; // If we find the branch, update it
+                }
+            }
+
+            // Explicitly check out the determined branch
+            await git.checkout(defaultBranch);
+
+
+            await healRepositoryFolders(targetPath);
+
+        } catch (error) {
               dialog.showErrorBox('Clone Failed', `Could not clone repository. This is often due to an invalid URL or an incorrect/missing Personal Access Token.\n\nError: ${error.message}`);
               return { success: false };
           }
@@ -780,16 +927,18 @@ ipcMain.handle('add-repository', async (_, repoUrl: string) => {
     if (!currentRepos.includes(repoName)) {
         setSetting('repositories', [...currentRepos, repoName]);
     }
+    setSetting('selectedRepository', repoName);
     return { success: true, repoName };
 });
 
 ipcMain.handle('remove-repository', async (_, repoName: string) => {
     const { response } = await dialog.showMessageBox({
         type: 'warning',
-        title: 'Remove Repository',
-        message: `Are you sure you want to remove '${repoName}'?`,
-        detail: 'This will only remove the repository from Scanstation. The project folder will NOT be deleted from your computer.',
-        buttons: ['Remove', 'Cancel'],
+        title: 'Permanently Delete Repository?',
+        message: `Are you sure you want to delete '${getRepoFolderName(repoName)}'?`,
+        // IMPORTANT: The warning message is now much stronger.
+        detail: 'This will PERMANENTLY DELETE the repository folder and all its projects from your computer. This action cannot be undone.',
+        buttons: ['Delete', 'Cancel'],
         defaultId: 1,
         cancelId: 1,
     });
@@ -799,11 +948,15 @@ ipcMain.handle('remove-repository', async (_, repoName: string) => {
     }
 
     try {
+        // Add this block to delete the actual folder
+        const repoPath = path.join(getStoragePath(), getRepoFolderName(repoName));
+        await fs.rm(repoPath, { recursive: true, force: true });
+
+        // This existing logic removes the repository from the app's settings
         const currentRepos = getSetting<string[]>('repositories') || [];
         const newRepos = currentRepos.filter(r => r !== repoName);
         setSetting('repositories', newRepos);
 
-        // If the removed repo was the selected one, clear the selection
         const selectedRepo = getSetting<string>('selectedRepository');
         if (selectedRepo === repoName) {
             setSetting('selectedRepository', newRepos.length > 0 ? newRepos[0] : null);
@@ -812,17 +965,30 @@ ipcMain.handle('remove-repository', async (_, repoName: string) => {
         return { success: true };
     } catch (error) {
         console.error('Failed to remove repository:', error);
+        dialog.showErrorBox('Delete Failed', `Could not delete the repository folder. Error: ${error.message}`);
         return { success: false, error: error.message };
     }
 });
 
 ipcMain.handle('git-status', async (_, { repoName }) => {
-    const repoPath = path.join(getStoragePath(), repoName);
+    // First, check if this is a local repository. If so, do nothing.
+    if (repoName.startsWith('[local] ')) {
+        return { isClean: true, files: [] }; // Return a default "clean" status
+    }
+
+    // For online repos, use the helper function to get the correct folder name
+    const repoPath = path.join(getStoragePath(), getRepoFolderName(repoName));
+
+    // Add a check to ensure the directory exists before running git commands
+    if (!await fs.pathExists(repoPath)) {
+        console.error(`git-status: Directory not found at ${repoPath}`);
+        return { isClean: true, files: [] };
+    }
+
     const status = await simpleGit(repoPath).status();
-    // Instead of returning the whole complex object,
-    // we return a new, simple object with only the data we need.
     return {
         files: status.files,
+        isClean: status.isClean(), // Pass the isClean status to the renderer
     };
 });
 
@@ -852,6 +1018,9 @@ ipcMain.on('heal-chapter-folders', async (event, chapterPath: string) => {
 });
 
 ipcMain.handle('git-commit', async (_, { repoName, message }) => {
+    if (repoName.startsWith('[local] ')) {
+        return { success: true, message: 'Local repository is already up-to-date.' };
+    }
     const repoPath = path.join(getStoragePath(), repoName);
     const git = simpleGit(repoPath);
     await git.add('.');
@@ -867,12 +1036,21 @@ ipcMain.handle('remove-pat', () => {
 });
 
 ipcMain.handle('git-push', async (_, { repoName }) => {
-    const repoPath = path.join(getStoragePath(), repoName);
+    if (repoName.startsWith('[local] ')) {
+        dialog.showErrorBox('Operation Not Supported', 'You cannot push a local repository.');
+        return { success: false };
+    }
+    // Update the path
+    const repoPath = path.join(getStoragePath(), getRepoFolderName(repoName));
     await performAuthenticatedPush(simpleGit(repoPath));
     return { success: true };
+
 });
 
 ipcMain.handle('git-sync-repository', async (event, repoName: string) => {
+    if (repoName.startsWith('[local] ')) {
+        return { success: true, message: 'Local repository is already up-to-date.' };
+    }
     const repoPath = path.join(getStoragePath(), repoName);
     const git = simpleGit(repoPath);
 
@@ -932,6 +1110,9 @@ ipcMain.handle('git-sync-repository', async (event, repoName: string) => {
 
 // Add this new handler to manage the force push
 ipcMain.handle('resolve-conflict-force-push', async (event, repoName) => {
+    if (repoName.startsWith('[local] ')) {
+        return { success: true, message: 'Local repository is already up-to-date.' };
+    }
     const repoPath = path.join(getStoragePath(), repoName);
     const git = simpleGit(repoPath);
     try {
@@ -1250,37 +1431,6 @@ async function updateAllRepositories() {
     console.log('Repository update check finished.');
 }
 
-const createWindow = (): BrowserWindow => {
-  const mainWindow = new BrowserWindow({
-    ...lastWindowBounds,
-    minWidth: 1100,
-    minHeight: 720,
-    show: false,
-    backgroundColor: '#23272a',
-    webPreferences: {
-      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
-      sandbox: false,
-      contextIsolation: true,
-      nodeIntegration: false,
-      webgl: true,
-      // offscreen: true        // <-- DELETE THIS LINE
-    },
-  });
-
-  Menu.setApplicationMenu(null);
-
-  mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
-  
-  mainWindow.once('ready-to-show', () => {
-    const selectedRepo = getSetting<string>('selectedRepository');
-    if (selectedRepo) {
-      loadProjects(mainWindow, selectedRepo);
-    }
-  });
-  return mainWindow;
-};
-
-
 app.whenReady().then(async () => {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
@@ -1293,7 +1443,6 @@ app.whenReady().then(async () => {
       const url = new URL(request.url);
       let decodedPath = decodeURI(url.pathname);
        if (process.platform === 'win32' && decodedPath.startsWith('/')) {
-        
         decodedPath = decodedPath.substring(1);
       }
       callback({ path: path.normalize(decodedPath) });
@@ -1313,12 +1462,55 @@ app.whenReady().then(async () => {
       updateSplashStatus('Backing up current user folder...');
       await backupProjects();
       updateSplashStatus('Done!');
-      const mainWindow = createWindow();
+      
+      // This now correctly calls the function that assigns the top-level mainWindow
+      createWindow(); 
+
       setTimeout(() => {
           if (splashWindow && !splashWindow.isDestroyed()) {
               splashWindow.close();
           }
-          mainWindow.show();
+          if (mainWindow) {
+            mainWindow.show();
+          }
+
+          // --- FILE WATCHER LOGIC ---
+          // This watcher monitors the main projects folder for deleted repositories.
+          const storagePath = getStoragePath();
+          repoWatcher = chokidar.watch(storagePath, {
+              depth: 0, // Only watch for repository folders, not their contents
+              ignoreInitial: true,
+          });
+
+          repoWatcher.on('unlinkDir', (deletedPath) => {
+              const deletedRepoName = path.basename(deletedPath);
+              console.log(`Repository folder deleted: ${deletedRepoName}. Updating settings.`);
+
+              const currentRepos = getSetting<string[]>('repositories') || [];
+              const selectedRepo = getSetting<string>('selectedRepository');
+              
+              // Find the exact identifier (e.g., '[local] Offline') using the folder name ('Offline')
+              const repoIdentifierToDelete = currentRepos.find(r => getRepoFolderName(r) === deletedRepoName);
+              
+              if (!repoIdentifierToDelete) return; // Not a tracked repo
+
+              // Remove the deleted repository from the list
+              const newRepos = currentRepos.filter(r => r !== repoIdentifierToDelete);
+              setSetting('repositories', newRepos);
+
+              // If the deleted repo was the one currently selected, update the selection
+              if (selectedRepo === repoIdentifierToDelete) {
+                  const newSelectedRepo = newRepos.length > 0 ? newRepos[0] : null;
+                  setSetting('selectedRepository', newSelectedRepo);
+              }
+
+              // Notify the renderer window to refresh its entire view
+              if (mainWindow && !mainWindow.isDestroyed()) {
+                  mainWindow.webContents.send('repositories-updated');
+              }
+          });
+          // --- END OF FILE WATCHER LOGIC ---
+
       }, 1200);
   }
 
@@ -1326,14 +1518,16 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
         const gitInstalled = await checkGitInstallation();
         if (gitInstalled) {
-            const mw = createWindow();
-            mw.show();
+            createWindow();
+            if(mainWindow) mainWindow.show();
         } else {
             createWelcomeWindow();
         }
     }
   });
 });
+
+
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

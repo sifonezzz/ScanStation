@@ -11,6 +11,37 @@ window.addEventListener('DOMContentLoaded', async () => {
     const doneBtn = document.getElementById('done-btn');
     doneBtn.addEventListener('click', () => window.api.closeSettingsWindow());
 
+    const addOfflineRepoBtn = document.getElementById('add-offline-repo-btn');
+    const addOfflineRepoModal = document.getElementById('add-offline-repo-modal');
+    const offlineRepoNameInput = document.getElementById('offline-repo-name-input') as HTMLInputElement;
+    const offlineModalCancelBtn = document.getElementById('offline-modal-cancel-btn');
+    const offlineModalCreateBtn = document.getElementById('offline-modal-create-btn');
+
+    addOfflineRepoBtn?.addEventListener('click', () => {
+        // Clear previous input and show the modal
+        if (offlineRepoNameInput) offlineRepoNameInput.value = '';
+        if (addOfflineRepoModal) addOfflineRepoModal.style.display = 'flex';
+    });
+
+    offlineModalCancelBtn?.addEventListener('click', () => {
+        if (addOfflineRepoModal) addOfflineRepoModal.style.display = 'none';
+    });
+
+    offlineModalCreateBtn?.addEventListener('click', async () => {
+        if (!offlineRepoNameInput) return;
+
+        const repoName = offlineRepoNameInput.value.trim();
+        if (repoName) {
+            const result = await window.api.addOfflineRepository(repoName);
+            if (result.success) {
+                alert(`Offline repository '${repoName}' created successfully!`);
+                if (addOfflineRepoModal) addOfflineRepoModal.style.display = 'none';
+                await populateRemoveRepoDropdown(); // Refresh the list
+            }
+            // Errors from the main process will be shown as dialogs
+        }
+    });
+    
     // --- Editor Path Logic ---
     const inputs: { [key in Editor]: HTMLInputElement } = {
         photoshop: document.getElementById('photoshopPath') as HTMLInputElement,
@@ -89,7 +120,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const addRepoModal = document.getElementById('add-repo-modal');
     const repoUrlInput = document.getElementById('repo-url-input') as HTMLInputElement;
     const modalCancelBtn = document.getElementById('modal-cancel-btn');
-    const modalPullBtn = document.getElementById('modal-pull-btn');
+    const modalPullBtn = document.getElementById('modal-pull-btn') as HTMLButtonElement;
 
     addRepoBtn.addEventListener('click', () => {
         repoUrlInput.value = '';
@@ -97,15 +128,31 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
     modalCancelBtn.addEventListener('click', () => addRepoModal.style.display = 'none');
     modalPullBtn.addEventListener('click', async () => {
-        const url = repoUrlInput.value.trim();
-        if (!url) return;
+    const url = repoUrlInput.value.trim();
+    if (!url) return;
+
+    // Define the spinner SVG and get the button's original text
+    const spinnerSVG = `<svg class="spinner" viewBox="0 0 50 50"><circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle></svg>`;
+    const originalText = modalPullBtn.textContent;
+
+    // Set the button to its loading state
+    modalPullBtn.innerHTML = spinnerSVG;
+    modalPullBtn.disabled = true;
+
+    try {
         const result = await window.api.addRepository(url);
         if (result.success) {
-            addRepoModal.style.display = 'none';
-            alert('Repository added successfully! The list will refresh when you close settings.');
+            if (addRepoModal) addRepoModal.style.display = 'none';
+            alert('Repository added successfully!');
+            await populateRemoveRepoDropdown();
         }
-        // Error is handled by main process
-    });
+        // If result.success is false, the main process shows an error dialog
+    } finally {
+        // IMPORTANT: Always restore the button to its normal state
+        modalPullBtn.innerHTML = originalText;
+        modalPullBtn.disabled = false;
+    }
+});
 
     const removeRepoDropdown = document.getElementById('repo-to-remove-dropdown') as HTMLSelectElement;
     const removeRepoBtn = document.getElementById('remove-repo-btn');

@@ -89,7 +89,7 @@ You can now create projects in the repository. Remember that GitHub doesn't trac
 * **Desktop Shortcut**: If you wish to create a desktop shortcut, a utility for this is available at the bottom of the **Settings** screen.
 
 
-- If you are pulling from a repository with progress, you may need to use the heal button (+) to regenerate empty folders.
+- **Folder Regeneration**: After pulling from the repository, ScanStation automatically restores any empty chapter folders that aren't tracked by Git.
 
 ---
 

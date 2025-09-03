@@ -60,8 +60,8 @@ window.addEventListener('DOMContentLoaded', () => {
   const editBtn = document.getElementById('edit-btn');
   projectGrid = document.getElementById('project-grid');
   const repoDropdown = document.getElementById('repo-dropdown') as HTMLSelectElement;
-  const pushRepoBtn = document.getElementById('push-repo-btn');
-  const pullRepoBtn = document.getElementById('pull-repo-btn');
+  const pushRepoBtn = document.getElementById('push-repo-btn') as HTMLButtonElement;
+  const pullRepoBtn = document.getElementById('pull-repo-btn') as HTMLButtonElement;
   const settingsBtn = document.getElementById('settings-btn');
 
   // --- Elements for Chapter Screen ---
@@ -179,7 +179,7 @@ window.addEventListener('DOMContentLoaded', () => {
             alert(`A merge conflict occurred in the following files: ${result.files.join(', ')}\n\nPlease resolve these conflicts outside of the app using a Git client or by discussing with your collaborators.`);
         } else {
             // No conflict, show the success message.
-            alert(result.message);
+            alert(result.message + "\n\nSuccessfully checked for and restored missing chapter folders.");
             window.api.loadProjects(selectedRepository);
         }
         // ▲▲▲ END OF CORRECTION ▲▲▲
@@ -196,7 +196,12 @@ window.addEventListener('DOMContentLoaded', () => {
     const newRepo = repoDropdown.value;
     selectedRepository = newRepo;
     window.api.setSelectedRepository(newRepo);
-  });
+
+    // Disable push/pull buttons if the repository is local
+    const isLocal = newRepo.startsWith('[local] ');
+    if (pushRepoBtn) pushRepoBtn.disabled = isLocal;
+    if (pullRepoBtn) pullRepoBtn.disabled = isLocal;
+});
 
   window.api.onProjectsLoaded((projects) => {
     projectGrid.innerHTML = '';

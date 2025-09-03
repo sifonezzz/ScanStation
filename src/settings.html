@@ -20,6 +20,24 @@
         .modal-content p { color: #99aab5; line-height: 1.5; }
         .modal-content input { width: 100%; padding: 10px; margin: 15px 0; box-sizing: border-box; }
         .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+        .spinner {
+                animation: rotate 1.5s linear infinite;
+                width: 16px;
+                height: 16px;
+            }
+            .spinner .path {
+                stroke: #ffffff;
+                stroke-linecap: round;
+                animation: dash 1.5s ease-in-out infinite;
+            }
+            @keyframes rotate {
+                100% { transform: rotate(360deg); }
+            }
+            @keyframes dash {
+                0% { stroke-dasharray: 1, 150; stroke-dashoffset: 0; }
+                50% { stroke-dasharray: 90, 150; stroke-dashoffset: -35; }
+                100% { stroke-dasharray: 90, 150; stroke-dashoffset: -124; }
+            }
     </style>
 </head>
 <body>
@@ -28,6 +46,18 @@
         
         <h3>Repository Management</h3>
         <button id="add-repo-btn" class="action-btn">+ Add Repository</button>
+        <button id="add-offline-repo-btn" class="action-btn" style="background-color: #40444B;">+ Add Offline Repository</button>
+
+        <div id="add-offline-repo-modal" class="modal-overlay">
+            <div class="modal-content">
+                <p>Please enter a name for the new local-only repository.</p>
+                <input type="text" id="offline-repo-name-input" placeholder="My Offline Project">
+                <div class="modal-buttons">
+                    <button id="offline-modal-cancel-btn">Cancel</button>
+                    <button id="offline-modal-create-btn" style="background-color: #43b581; color: white;">Create</button>
+                </div>
+            </div>
+        </div>
 
         <h3>Remove Repository</h3>
         <div class="form-group path-control">

@@ -1,7 +1,7 @@
 {
   "name": "scanstation",
   "productName": "scanstation",
-  "version": "0.9.1",
+  "version": "0.10.0-alpha",
   "description": "A collaboration tool for solo and group scanlation projects.",
   "main": ".webpack/main",
   "scripts": {

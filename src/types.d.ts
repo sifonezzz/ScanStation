@@ -39,6 +39,7 @@ export interface IScanstationAPI {
   getEditorPaths: () => Promise<{ [key: string]: string }>;
   selectEditorPath: () => Promise<string | null>;
   setEditorPath: (data: { editor: Editor; path: string }) => void;
+  addOfflineRepository: (repoName: string) => Promise<{ success: boolean }>;
   // Splash Window
   onStatusUpdate: (callback: (message: string) => void) => void;
   // Create Project Window

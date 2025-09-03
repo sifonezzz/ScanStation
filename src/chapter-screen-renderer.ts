@@ -26,7 +26,7 @@ let activeView: {
 } = { name: 'none', saveData: async () => {} };
 
 // Declare variables here
-let projectNameHeader: HTMLElement, backBtn: HTMLElement, openFolderBtn: HTMLElement, healFoldersBtn: HTMLElement, homeBtn: HTMLElement, translateBtn: HTMLElement, proofreadBtn: HTMLElement, typesetBtn: HTMLElement, galleryViewContainer: HTMLElement, workspacePlaceholder: HTMLElement, pageListDiv: HTMLElement;
+let projectNameHeader: HTMLElement, backBtn: HTMLElement, openFolderBtn: HTMLElement, homeBtn: HTMLElement, translateBtn: HTMLElement, proofreadBtn: HTMLElement, typesetBtn: HTMLElement, galleryViewContainer: HTMLElement, workspacePlaceholder: HTMLElement, pageListDiv: HTMLElement;
 let viewTitleHeader: HTMLElement;
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -34,7 +34,6 @@ window.addEventListener('DOMContentLoaded', () => {
     projectNameHeader = document.getElementById('project-name-header');
     backBtn = document.getElementById('back-to-projects-btn');
     openFolderBtn = document.getElementById('open-folder-btn');
-    healFoldersBtn = document.getElementById('heal-folders-btn');
     homeBtn = document.getElementById('home-btn');
     translateBtn = document.getElementById('translate-btn');
     proofreadBtn = document.getElementById('proofread-btn');
@@ -71,20 +70,6 @@ window.addEventListener('DOMContentLoaded', () => {
     openFolderBtn.addEventListener('click', (e) => { 
         e.preventDefault(); 
         if (currentChapterPath) window.api.openChapterFolder(currentChapterPath); 
-    });
-
-    healFoldersBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (currentChapterPath) {
-            window.api.healChapterFolders(currentChapterPath);
-        }
-    });
-
-    window.api.onHealFoldersComplete(async (result) => {
-        if (result.success) {
-            console.log('Folders healed. Refreshing page list.');
-            await loadAndRenderPageStatus();
-        }
     });
 
     backBtn.addEventListener('click', (e) => { 
