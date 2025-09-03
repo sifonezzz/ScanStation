@@ -1,4 +1,5 @@
 import type { IScanstationAPI, Editor } from './types';
+import { gsap } from 'gsap';
 
 let currentRepoName: string | null = null;
 let currentProjectName: string | null = null;
@@ -10,6 +11,62 @@ let selectedRepository: string | null = null;
 let hasPat = false;
 
 const spinnerSVG = `<svg class="spinner" viewBox="0 0 50 50"><circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle></svg>`;
+
+function createCircleExpandAnimation(projectCard: HTMLElement, callback: () => void) {
+  // Get position and dimensions of the clicked project card
+  const rect = projectCard.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  
+  // Create overlay with circle
+  const overlay = document.createElement('div');
+  overlay.style.position = 'fixed';
+  overlay.style.top = '0';
+  overlay.style.left = '0';
+  overlay.style.width = '100%';
+  overlay.style.height = '100%';
+  overlay.style.zIndex = '1000';
+  overlay.style.pointerEvents = 'none';
+  overlay.style.overflow = 'hidden';
+  
+  const circle = document.createElement('div');
+  circle.style.position = 'absolute';
+  circle.style.top = `${centerY}px`;
+  circle.style.left = `${centerX}px`;
+  circle.style.width = '0px';
+  circle.style.height = '0px';
+  circle.style.borderRadius = '50%';
+  circle.style.backgroundColor = '#2c2f33';
+  circle.style.transform = 'translate(-50%, -50%)';
+  
+  overlay.appendChild(circle);
+  document.body.appendChild(overlay);
+  
+  // Calculate final circle size (cover entire screen)
+  const finalSize = Math.max(window.innerWidth, window.innerHeight) * 1.5;
+  
+  // Animate the circle expanding
+  gsap.to(circle, {
+    width: finalSize,
+    height: finalSize,
+    duration: 0.6,
+    ease: 'power2.inOut',
+    onComplete: () => {
+      // Execute the callback (show chapter selection)
+      callback();
+      
+      // Fade out the overlay
+      gsap.to(overlay, {
+        opacity: 0,
+        duration: 0.3,
+        delay: 0.1,
+        onComplete: () => {
+          document.body.removeChild(overlay);
+        }
+      });
+    }
+  });
+}
 
 function setButtonLoadingState(button: HTMLButtonElement, isLoading: boolean, originalText: string) {
     if (isLoading) {
@@ -201,7 +258,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const isLocal = newRepo.startsWith('[local] ');
     if (pushRepoBtn) pushRepoBtn.disabled = isLocal;
     if (pullRepoBtn) pullRepoBtn.disabled = isLocal;
-});
+  });
 
   window.api.onProjectsLoaded((projects) => {
     projectGrid.innerHTML = '';
@@ -251,9 +308,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
       card.addEventListener('click', () => {
         if (!isEditMode) {
-          showChapterSelection(selectedRepository, project.name);
+            createCircleExpandAnimation(card, () => {
+              showChapterSelection(selectedRepository, project.name);
+            });
         }
       });
+      
       projectGrid.appendChild(card);
     }
   });
@@ -261,7 +321,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // --- Initial Load ---
   initializeProjectView();
   checkAndSetGitIdentity();
-});
+}); // <-- This closes the DOMContentLoaded event listener
 
 async function checkAndSetGitIdentity() {
     const identity = await window.api.getGitIdentity();
@@ -359,4 +419,3 @@ function showChapterSelection(repoName: string, projectName: string) {
   // 4. Request the chapters for the selected project
   window.api.getChapters(repoName, projectName);
 }
-export {};
