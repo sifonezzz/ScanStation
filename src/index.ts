@@ -774,9 +774,10 @@ ipcMain.handle('submit-project-update', async (_, data) => {
 ipcMain.on('go-back-to-projects', (_, { repoName, projectName }) => {
     const mainWindow = BrowserWindow.getAllWindows()[0];
     if (mainWindow) {
+        // Just load and show chapter selection - fade out is handled by renderer
         mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
-        // After the main window loads, tell it to show the chapter selection screen
-        mainWindow.webContents.once('dom-ready', () => {
+        
+        mainWindow.webContents.once('did-finish-load', () => {
             mainWindow.webContents.send('show-chapter-selection-for-project', { repoName, projectName });
         });
     }

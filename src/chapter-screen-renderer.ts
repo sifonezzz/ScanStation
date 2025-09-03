@@ -73,10 +73,13 @@ window.addEventListener('DOMContentLoaded', () => {
     });
 
     backBtn.addEventListener('click', (e) => { 
-        e.preventDefault(); 
-        window.api.stopWatchingChapter();
-        window.api.goBackToProjects(currentRepoName, currentProjectName); 
-    });
+    e.preventDefault(); 
+    window.api.stopWatchingChapter();
+    // Use the API method to go back to chapter selection
+    if (currentRepoName && currentProjectName) {
+        window.api.goBackToProjects(currentRepoName, currentProjectName);
+    }
+  });
   
     homeBtn.addEventListener('click', async (e) => {
         e.preventDefault();

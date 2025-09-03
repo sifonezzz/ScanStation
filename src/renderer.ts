@@ -135,6 +135,12 @@ window.addEventListener('DOMContentLoaded', () => {
     initializeProjectView();
   });
 
+  // Listen for going back to chapter selection
+window.api.onShowChapterSelection((data) => {
+    showChapterSelection(data.repoName, data.projectName);
+});
+  
+
   // --- CHAPTER SCREEN LOGIC ---
   window.api.onChaptersLoaded((chapters) => {
     chapterGrid.innerHTML = '';
@@ -466,6 +472,9 @@ function showChapterSelection(repoName: string, projectName: string) {
 
   // Get the screen containers
   const projectScreen = document.getElementById('project-screen');
+  if (projectScreen) {
+    projectScreen.style.display = 'none';
+  }
   const chapterScreen = document.getElementById('chapter-screen');
   
   // Get elements from the existing chapter screen to populate them

@@ -58,6 +58,7 @@ export interface IScanstationAPI {
   onShowChapterSelection: (callback: (data: { repoName: string, projectName: string }) => void) => void;
   openCreateChapterWindow: (repoName: string, projectName: string) => void;
   goBackToProjects: (repoName: string, projectName: string) => void;
+  
 
   // Create Chapter Window
   onProjectDataForCreateChapter: (callback: (data: { repoName: string; projectName: string }) => void) => void;
