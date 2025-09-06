@@ -137,6 +137,14 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Listen for going back to chapter selection
 window.api.onShowChapterSelection((data) => {
+    // This event comes from the main process after reloading the main window.
+    // We must manually hide the project screen, which is visible by default.
+    const projectScreen = document.getElementById('project-screen');
+    if (projectScreen) {
+        projectScreen.style.display = 'none';
+    }
+    
+    // Now, call the function to show and populate the chapter screen
     showChapterSelection(data.repoName, data.projectName);
 });
   
@@ -333,9 +341,60 @@ window.api.onShowChapterSelection((data) => {
 
       card.addEventListener('click', () => {
         if (!isEditMode) {
-            createCircleExpandAnimation(card, () => {
-              showChapterSelection(selectedRepository, project.name);
-            });
+            // 1. Get click position
+            const rect = card.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            // 2. Calculate end radius
+            const endRadius = Math.hypot(Math.max(centerX, window.innerWidth - centerX), Math.max(centerY, window.innerHeight - centerY));
+
+            // 3. Prepare chapter screen content
+            showChapterSelection(selectedRepository, project.name);
+
+            // 4. Get elements
+            const chapterScreen = document.getElementById('chapter-screen');
+            const projectScreen = document.getElementById('project-screen');
+
+            // --- Apply Overlay Styles ---
+            chapterScreen.style.position = 'fixed';
+            chapterScreen.style.top = '0';
+            chapterScreen.style.left = '0';
+            chapterScreen.style.width = '100%';
+            chapterScreen.style.height = '100%'; 
+            chapterScreen.style.zIndex = '1000';
+            
+            // --- FIX: ADD BACKGROUND STYLES ---
+            // These must match the <body> styles [cite: 469] to create an opaque reveal
+            chapterScreen.style.backgroundColor = '#1e2124';
+            chapterScreen.style.backgroundImage = 'linear-gradient(to top, #1e2124, #282b30)';
+
+            // 5. Animate the clip-path
+            gsap.fromTo(chapterScreen, 
+                { 
+                    clipPath: `circle(0px at ${centerX}px ${centerY}px)` 
+                },
+                { 
+                    clipPath: `circle(${endRadius}px at ${centerX}px ${centerY}px)`, 
+                    duration: 0.6, 
+                    ease: 'power2.inOut',
+                    onComplete: () => {
+                        // Animation finished: hide the project screen underneath
+                        if (projectScreen) projectScreen.style.display = 'none';
+                        
+                        // Clean up ALL inline styles we added for the transition
+                        chapterScreen.style.clipPath = 'none'; 
+                        chapterScreen.style.position = '';
+                        chapterScreen.style.top = '';
+                        chapterScreen.style.left = '';
+                        chapterScreen.style.width = '';
+                        chapterScreen.style.height = '';
+                        chapterScreen.style.zIndex = '';
+                        chapterScreen.style.backgroundColor = '';
+                        chapterScreen.style.backgroundImage = '';
+                    }
+                }
+            );
         }
       });
       
@@ -470,46 +529,27 @@ function showChapterSelection(repoName: string, projectName: string) {
   currentRepoName = repoName;
   currentProjectName = projectName;
 
-  // Get the screen containers
-  const projectScreen = document.getElementById('project-screen');
-  if (projectScreen) {
-    projectScreen.style.display = 'none';
-  }
-  const chapterScreen = document.getElementById('chapter-screen');
-  
   // Get elements from the existing chapter screen to populate them
+  const chapterScreen = document.getElementById('chapter-screen');
   const projectNameHeader = document.getElementById('project-name-header');
   const chapterGrid = document.getElementById('chapter-grid');
 
-  if (!projectScreen || !chapterScreen || !projectNameHeader || !chapterGrid) {
+  if (!chapterScreen || !projectNameHeader || !chapterGrid) {
     console.error('Could not find required elements to show chapter screen.');
     return;
   }
 
-  // 1. Set the header title
+  // 1. Set the header title [cite: 877]
   projectNameHeader.textContent = projectName;
   
-  // 2. Clear the grid and show a loading message
+  // 2. Clear the grid and show a loading message [cite: 878]
   chapterGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">Loading chapters...</p>`;
   
-  // 3. Request the chapters for the selected project
+  // 3. Request the chapters for the selected project [cite: 879]
   window.api.getChapters(repoName, projectName);
   
-  // 4. Show the chapter screen (it will be hidden initially for the animation)
+  // 4. Instantly show the chapter screen (it will be hidden by the clip-path)
+  // This replaces all previous GSAP logic and opacity settings [cite: 880, 881]
   chapterScreen.style.display = 'block';
-  chapterScreen.style.opacity = '0';
-  
-  // 5. Hide the project screen with a fade
-  gsap.to(projectScreen, {
-    opacity: 0,
-    duration: 0.3,
-    onComplete: () => {
-      projectScreen.style.display = 'none';
-      // Fade in the chapter screen
-      gsap.to(chapterScreen, {
-        opacity: 1,
-        duration: 0.3
-      });
-    }
-  });
+  chapterScreen.style.opacity = '1';
 }

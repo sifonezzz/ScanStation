@@ -164,17 +164,14 @@ ipcMain.handle('get-proofread-images', async (_, { chapterPath, pageFile }) => {
         const allTypesetFiles = await fs.readdir(typesetDir);
         const typesetFileName = allTypesetFiles.find(f => getBaseName(f) === baseName);
 
-        if (!typesetFileName) {
-            // If no matching typeset file is found, return an error
-            return { success: false, error: `Typeset file for ${baseName} not found.` };
-        }
-        
-        // Return the full paths for both raw and the found typeset file
+        // MODIFICATION: We no longer return 'success: false' if typesetFileName is missing.
+        // We now always return success, and the tsPath will be null if typesetFileName is undefined.
         return {
             success: true,
             rawPath: path.join(rawDir, pageFile),
-            tsPath: path.join(typesetDir, typesetFileName)
+            tsPath: typesetFileName ? path.join(typesetDir, typesetFileName) : null
         };
+        
     } catch (error) {
         console.error('Failed to get proofread images:', error);
         return { success: false, error: error.message };

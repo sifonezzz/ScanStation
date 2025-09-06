@@ -385,7 +385,6 @@ function initProofreadView(startingIndex: number) {
       await saveAnnotations();
       setTimeout(() => { saveBtn.textContent = originalText; }, 1000);
     });
-
   const saveAnnotations = async () => {
     if (!pages[currentPageIndex]) return;
     const pageFile = pages[currentPageIndex].fileName;
@@ -397,7 +396,6 @@ function initProofreadView(startingIndex: number) {
       alert(`Could not save annotations: ${result.error}`);
     }
   };
-
   activeView = {
     name: 'proofread',
     saveData: saveAnnotations,
@@ -449,28 +447,39 @@ function initProofreadView(startingIndex: number) {
     
     // Get typeset image path using the new handler that finds the file regardless of extension
     const imagePaths = await window.api.getProofreadImages({ chapterPath: currentChapterPath, pageFile: page.fileName });
+    const timestamp = `?t=${Date.now()}`; // Use timestamp to bust cache
+
     if (imagePaths.success) {
-        // Use a timestamp to bust the browser's cache for both images
-        const timestamp = `?t=${Date.now()}`;
+        // Check and set RAW path individually
         if (rawImagePath) {
             rawImage.src = `scanstation-asset:///${rawImagePath.replace(/\\/g, '/')}?${timestamp}`;
+        } else {
+            rawImage.src = ''; // Ensure it's blank if no path was found
         }
-        tsImage.src = `scanstation-asset:///${imagePaths.tsPath.replace(/\\/g, '/')}?${timestamp}`;
+        
+        // Check and set TYPESET path individually (This fixes the 'null.replace' error)
+        if (imagePaths.tsPath) {
+            tsImage.src = `scanstation-asset:///${imagePaths.tsPath.replace(/\\/g, '/')}?${timestamp}`;
+        } else {
+            tsImage.src = ''; // Ensure it's blank if the path was null
+        }
     } else {
-        console.error('Failed to load typeset image:', imagePaths.error);
+        // This 'else' block will now only catch critical errors (e.g., folder not readable)
+        console.error('Failed to load proofread images:', imagePaths.error);
+        rawImage.src = '';
+        tsImage.src = '';
     }
 
     // Keep the onerror handler in case the typeset file is missing or corrupted
-    tsImage.onerror = () => { tsImage.src = ''; };
+    tsImage.onerror = () => { tsImage.src = '';
+    };
 
     // Load annotations as before
     const annotations = await window.api.getFileContent(`${currentChapterPath}/data/PR Data/${getBaseName(page.fileName)}_proof.txt`);
     annotationsText.value = annotations;
   };
-
   nextBtn.addEventListener('click', () => loadPage(currentPageIndex + 1));
   prevBtn.addEventListener('click', () => loadPage(currentPageIndex - 1));
-
   correctBtn.addEventListener('click', async () => {
     await saveAnnotations();
     const pageFile = pages[currentPageIndex].fileName;
@@ -482,7 +491,8 @@ function initProofreadView(startingIndex: number) {
       if (currentPageIndex < pages.length - 1) { loadPage(currentPageIndex + 1); } else { showHomeView(); }
     } else {
       alert(`Could not mark page as correct: ${result.error}`);
-     }
+   
+    }
   });
 
   loadPage(startingIndex);
