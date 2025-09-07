@@ -17,7 +17,26 @@
             height: 100vh;
         }
 
-        
+        /* Make the entire header draggable */
+            .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 24px;
+        /* Darker background gradient */
+        background-color: #23272a;
+        background-image: linear-gradient(to bottom, #2a2d30, #23272a);
+        border-bottom: 1px solid #23272a;
+        /* This makes the header draggable */
+        -webkit-app-region: drag;
+        box-sizing: border-box; 
+        position: relative; /* Needed for controls */
+        }
+
+    /* Mark all interactive elements in the header as "non-draggable" so they remain clickable */
+    .header button, .header select {
+      -webkit-app-region: no-drag;
+    }
         .header { display: flex; justify-content: space-between;
         align-items: center; padding: 16px 24px; background-color: #2c2f33; border-bottom: 1px solid #4a4d52;
         }
@@ -67,7 +86,9 @@
         }
 
         .header-right { display: flex; align-items: center; gap: 10px; }
-        .action-btn { transition: transform 0.1s, background-color 0.2s; transition: background-color 0.2s; display: flex; align-items: center; gap: 8px; background-color: #10B981; color: white; padding: 8px 16px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .action-btn { transition: transform 0.1s, background-color 0.2s;
+        transition: background-color 0.2s; display: flex; align-items: center; gap: 8px; background-color: #43b581; color: white; padding: 8px 16px; font-size: 14px; border: none;
+        border-radius: 50px; cursor: pointer; font-weight: bold; }
         .action-btn svg {
             width: 18px; /* Sets the icon size */
             height: 18px;
@@ -86,12 +107,16 @@
         }
         
         
-        #translate-btn { background-color: #3B82F6; } /* Pastel Blue/Purple */
-        #proofread-btn { background-color: #10B981; } /* Pastel Green */
+        #translate-btn { background-color: #3B82F6;
+        }
+        #proofread-btn { background-color: #10B981;
+        }
         #typeset-btn { background-color: #faa61a; } /* Pastel Orange */
 
-        #translate-btn:hover { background-color: #677bc4; }
-        #proofread-btn:hover { background-color: #3aa171; }
+        #translate-btn:hover { background-color: #2563EB;
+        }
+        #proofread-btn:hover { background-color: #059669;
+        }
         #typeset-btn:hover { background-color: #e0930a; }
 
         .main-view { flex-grow: 1; padding: 24px; display: flex; justify-content: center; align-items: center; color: #99aab5; overflow-x: hidden; min-height: 0; margin-right: 40px; }
@@ -380,6 +405,36 @@
             color: #99aab5;
             font-weight: bold;
             margin: 0 auto; /* Centers the page counter in the footer */
+        }
+        /* --- Custom Window Controls --- */
+        .window-controls {
+        display: flex;
+        position: absolute; /* Position them in the top-right of the header */
+        top: 0;
+        right: 0;
+        height: 40px; /* Controls the clickable height */
+        -webkit-app-region: no-drag; /* These buttons are clickable, NOT draggable */
+        }
+        .window-controls button {
+        border: none;
+        background: transparent;
+        color: #99aab5;
+        padding: 0 15px;
+        font-size: 16px;
+        font-weight: bold;
+        line-height: 40px;
+        border-radius: 0; /* These are not pill buttons */
+        transform: none; /* Override button "lift" */
+        transition: background-color 0.2s, color 0.2s;
+        }
+        .window-controls button:hover {
+        background-color: #4a4d52;
+        color: white;
+        transform: none; /* Override hover lift */
+        }
+        .window-controls button.close:hover {
+        background-color: #EF4444; /* Use our danger color */
+        color: white;
         }
     </style>
 </head>

@@ -419,23 +419,43 @@ async function backupProjects() {
 
 async function refreshChapters(targetWindow: BrowserWindow, repoName: string, projectName: string) {
     if (!targetWindow || targetWindow.isDestroyed()) return;
+    // 1. Get Project Cover Path (New)
+    const repoFolderName = getRepoFolderName(repoName); // [cite: 583]
+    const projectPath = path.join(getStoragePath(), repoFolderName, projectName);
+    const coverPath = path.join(projectPath, 'cover.jpg'); // Logic based on [cite: 595]
 
-    const projectPath = path.join(getStoragePath(), getRepoFolderName(repoName), projectName);
+    let chaptersData: { name: string; progress: number }[] = [];
+
     try {
       const chapterFolders = await fs.readdir(projectPath, { withFileTypes: true });
-      const chapters = chapterFolders
-        .filter(dirent => dirent.isDirectory() && dirent.name.toLowerCase().startsWith('chapter '))
-        .map(dirent => ({ name: dirent.name }))
-        .sort((a, b) => {
+      const chapterDirents = chapterFolders
+        .filter(dirent => dirent.isDirectory() && dirent.name.toLowerCase().startsWith('chapter ')) // [cite: 616]
+        .sort((a, b) => { // [cite: 616]
           const numA = parseInt(a.name.replace(/[^0-9]/g, ''), 10);
           const numB = parseInt(b.name.replace(/[^0-9]/g, ''), 10);
           return numA - numB;
         });
-      targetWindow.webContents.send('chapters-loaded', chapters);
+    
+      // NEW: Run progress calculation for all chapters in parallel
+      chaptersData = await Promise.all(chapterDirents.map(async (dirent) => {
+          const chapterPath = path.join(projectPath, dirent.name);
+          const progress = await getChapterProgressPercent(chapterPath); // Our new helper
+          return {
+              name: dirent.name,
+              progress: progress // Add the progress percentage
+          };
+      }));
+
     } catch (error) {
       console.error(`Could not read chapters for ${projectName}:`, error);
-      targetWindow.webContents.send('chapters-loaded', []);
+      // chaptersData is already []
     }
+
+    // Send ONE payload with all data using a new channel name
+    targetWindow.webContents.send('chapter-list-data-loaded', {
+        coverPath: coverPath,
+        chapters: chaptersData
+    });
 }
 
 async function initializeNewProject(projectPath: string, coverImagePath: string): Promise<void> {
@@ -1140,6 +1160,83 @@ async function getChapterStatus(chapterPath: string) {
     if (!await fs.pathExists(statusFilePath)) return {};
     const content = await fs.readFile(statusFilePath, 'utf-8');
     return content ? JSON.parse(content) : {};
+}
+
+// This helper calculates the total % complete for a given chapter
+async function getChapterProgressPercent(chapterPath: string): Promise<number> {
+  try {
+    const rawFolderPath = path.join(chapterPath, 'Raws');
+    // If Raws folder doesn't exist or is empty, chapter is 0% complete
+    if (!await fs.pathExists(rawFolderPath)) return 0;
+    const rawFiles = (await fs.readdir(rawFolderPath))
+        .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+    // Get all page status info, reusing existing logic from the workspace dashboard
+    const cleanedFiles = await fs.readdir(path.join(chapterPath, 'Raws Cleaned'));
+    const typesetFiles = await fs.readdir(path.join(chapterPath, 'Typesetted'));
+    const cleanedBaseNames = new Set(cleanedFiles.map(getBaseName));
+    const typesetBaseNames = new Set(typesetFiles.map(getBaseName));
+    const statusData = await getChapterStatus(chapterPath); // Existing helper [cite: 715]
+
+    // This logic creates the definitive list of "pages" (handling spreads) [cite: 719-731]
+    let finalPages = rawFiles.map(pageFile => {
+        const baseName = getBaseName(pageFile);
+        return {
+            fileName: pageFile,
+            status: {
+                CL: cleanedBaseNames.has(baseName),
+                TS: typesetBaseNames.has(baseName),
+                TL: (statusData[pageFile] || {}).TL || false,
+                PR: (statusData[pageFile] || {}).PR || false,
+                QC: (statusData[pageFile] || {}).QC || false,
+            }
+        };
+    });
+
+    const typesetSpreads = typesetFiles.filter(f => /^\d+[-_]\d+\..+$/.test(f)); // [cite: 725]
+    for (const spreadFile of typesetSpreads) {
+        const spreadMatch = getBaseName(spreadFile).match(/(\d+)[-_](\d+)/);
+        if (!spreadMatch) continue;
+        const pageNum1 = spreadMatch[1].padStart(2, '0');
+        const pageNum2 = spreadMatch[2].padStart(2, '0');
+        const firstPageIndex = finalPages.findIndex(p => getBaseName(p.fileName).startsWith(pageNum1));
+        if (firstPageIndex !== -1) {
+            finalPages = finalPages.filter(p => !getBaseName(p.fileName).startsWith(pageNum1) && !getBaseName(p.fileName).startsWith(pageNum2));
+            const spreadPageEntry = {
+                fileName: spreadFile,
+                status: {
+                    CL: true, TS: true, TL: true, // Spreads count as these 3 complete
+                    PR: (statusData[spreadFile] || {}).PR || false,
+                    QC: (statusData[spreadFile] || {}).QC || false,
+                }
+            };
+            finalPages.splice(firstPageIndex, 0, spreadPageEntry);
+        }
+    }
+    
+    // --- New Cumulative Calculation ---
+    const numPages = finalPages.length; 
+    if (numPages === 0) return 0;
+    
+    const totalSteps = numPages * 5; // 5 steps per page (CL, TL, TS, PR, QC) [cite: 56]
+    let completedSteps = 0;
+    
+    for (const page of finalPages) {
+        if (page.status.CL === true) completedSteps++;
+        if (page.status.TL === true) completedSteps++;
+        if (page.status.TS === true) completedSteps++;
+        if (page.status.PR === true) completedSteps++; // status 'annotated' is not 'true'
+        if (page.status.QC === true) completedSteps++;
+    }
+    
+    if (totalSteps === 0) return 0;
+    return Math.floor((completedSteps / totalSteps) * 100);
+
+  } catch (error) {
+    // This often fails gracefully if a chapter has just been created and has no subfolders
+    return 0; 
+  }
 }
 
 async function saveChapterStatus(chapterPath: string, status: any) {

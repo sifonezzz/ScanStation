@@ -310,6 +310,89 @@
       transform: translateY(0px); /* Press back down on click */
     }
 
+
+      /* --- New Project Hero Banner Styles --- */
+    .project-hero-banner {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 20px 24px;
+        background-color: #2c2f33; /* Use the card background color */
+        border-bottom: 1px solid #4a4d52;
+    }
+    #hero-project-cover {
+        width: 80px;
+        height: 114px; /* Maintain 512x728 aspect ratio */
+        object-fit: cover;
+        border-radius: 6px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    .hero-project-info {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        flex-grow: 1; /* Pushes button to the right */
+    }
+    .hero-project-info h2 {
+        margin: 0;
+        font-size: 24px;
+        color: white;
+    }
+    .hero-project-info span {
+        font-size: 14px;
+        color: #99aab5;
+    }
+    /* Style the create button (which we already rounded/colored) */
+    #create-chapter-btn {
+        padding: 10px 20px;
+        font-size: 14px;
+        /* Make sure it's using our new color */
+        background-color: #3B82F6; 
+    }
+    #create-chapter-btn:hover {
+        background-color: #2563EB;
+    }
+
+
+    /* --- New Chapter Card Styles --- */
+    .chapter-card {
+        /* Add new properties to the base class */
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        /* Add hover lift effect */
+        transition: transform 0.2s ease, background-color 0.2s ease;
+    }
+    .chapter-card:hover {
+         transform: translateY(-2px);
+         background-color: #3b3e44; /*  */
+    }
+    .chapter-card-main {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: bold;
+        font-size: 16px;
+    }
+    /* Progress bar styles copied from chapter-screen.html [cite: 353, 355] */
+    .progress-bar-background {
+        width: 100%;
+        background-color: #23272a;
+        border-radius: 50px; /* Make it rounded */
+        height: 20px;
+        overflow: hidden;
+    }
+    .progress-bar-foreground {
+        height: 100%;
+        background-color: #10B981; /* Use our new Emerald Green */
+        border-radius: 50px;
+        transition: width 0.5s ease-in-out;
+        text-align: center;
+        line-height: 20px;
+        font-size: 12px;
+        color: white;
+        font-weight: bold;
+    }
 </style>
 </head>
 <body>
@@ -344,13 +427,15 @@
             <a href="#" id="back-to-projects-btn" class="back-btn">&larr;</a>
             <h1 id="project-name-header"></h1>
         </div>
-        <button id="create-chapter-btn">+ New Chapter</button>
     </div>
 
-    <div class="git-container">
-        <div class="git-header">
-            <h2>Chapters</h2>
+    <div class="project-hero-banner">
+        <img src="" id="hero-project-cover" alt="Project Cover">
+        <div class="hero-project-info">
+            <h2 id="hero-project-title"></h2>
+            <span id="hero-repo-name"></span>
         </div>
+        <button id="create-chapter-btn">+ New Chapter</button> 
     </div>
 
     <div id="chapter-grid"></div>

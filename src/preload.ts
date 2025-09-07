@@ -54,8 +54,7 @@ const api: IScanstationAPI = {
   // --- Chapter Screen Navigation & Creation ---
   onProjectDataForChapterScreen: (callback: (data: any) => void) => ipcRenderer.on('project-data-for-chapter-screen', (_event, data) => callback(data)),
   getChapters: (repoName: string, projectName: string) => ipcRenderer.send('get-chapters', { repoName, projectName }),
-  onChaptersLoaded: (callback: (chapters: Chapter[]) => void) => ipcRenderer.on('chapters-loaded', (_event, chapters) => callback(chapters)),
-  onShowChapterSelection: (callback: (data: { repoName: string, projectName: string }) => void) => ipcRenderer.on('show-chapter-selection-for-project', (_event, data) => callback(data)),
+  onChapterListDataLoaded: (callback: (data: { coverPath: string, chapters: any[] }) => void) => ipcRenderer.on('chapter-list-data-loaded', (_event, data) => callback(data)),  onShowChapterSelection: (callback: (data: { repoName: string, projectName: string }) => void) => ipcRenderer.on('show-chapter-selection-for-project', (_event, data) => callback(data)),
   openCreateChapterWindow: (repoName: string, projectName: string) => ipcRenderer.send('open-create-chapter-window', { repoName, projectName }),
   goBackToProjects: (repoName: string, projectName: string) => ipcRenderer.send('go-back-to-projects', { repoName, projectName }),
 

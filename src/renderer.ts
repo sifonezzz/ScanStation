@@ -150,26 +150,55 @@ window.api.onShowChapterSelection((data) => {
   
 
   // --- CHAPTER SCREEN LOGIC ---
-  window.api.onChaptersLoaded((chapters) => {
+// NEW LISTENER for all chapter data
+window.api.onChapterListDataLoaded((data: { coverPath: string; chapters: { name: string; progress: number }[] }) => {    // 1. Populate the Hero Banner
+    const heroCover = document.getElementById('hero-project-cover') as HTMLImageElement;
+    const heroTitle = document.getElementById('hero-project-title');
+    const heroRepo = document.getElementById('hero-repo-name');
+    
+    if (heroCover) {
+        const formattedPath = data.coverPath.replace(/\\/g, '/');
+        heroCover.src = `scanstation-asset:///${formattedPath}`;
+    }
+    if (heroTitle) heroTitle.textContent = currentProjectName; // This is stored when showChapterSelection is called
+    if (heroRepo) heroRepo.textContent = currentRepoName;
+
+    // 2. Populate the Chapter Grid
+    const chapterGrid = document.getElementById('chapter-grid');
     chapterGrid.innerHTML = '';
+    const chapters = data.chapters;
+
     if (chapters.length === 0) {
         chapterGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">No chapters found. Click '+ New Chapter' to get started!</p>`;
         return;
     }
 
     for (const chapter of chapters) {
+        // Use the new, richer card HTML
         const card = document.createElement('div');
-        card.className = 'chapter-card';
-        card.textContent = chapter.name.replace(/_/g, ' ');
-        card.addEventListener('click', () => {
-            if (!isEditMode) {
+        card.className = 'chapter-card'; // Use the base class
+        
+        card.innerHTML = `
+            <div class="chapter-card-main">
+                <span class="chapter-name">${chapter.name.replace(/_/g, ' ')}</span>
+            </div>
+            <div class="chapter-card-progress">
+                <div class="progress-bar-background">
+                    <div class="progress-bar-foreground" style="width: ${chapter.progress}%;">
+                        ${chapter.progress}%
+                    </div>
+                </div>
+            </div>
+        `;
+
+        card.addEventListener('click', () => { // [from cite: 825]
+            if (!isEditMode) { // [from cite: 825]
+                // Use the restored Exit Animation logic
                 createRectangleExpandAnimation(card, () => {
-                    // This callback now runs *after* the animation starts
                     window.api.openProject({
-                        repoName: currentRepoName, 
-                        projectName: currentProjectName, 
+                        repoName: currentRepoName,
+                        projectName: currentProjectName,
                         chapterName: chapter.name
-                        // We no longer send the 'rect' data
                     });
                 });
             }
@@ -229,7 +258,7 @@ window.api.onShowChapterSelection((data) => {
 
   pushRepoBtn.addEventListener('click', async () => {
     if (!selectedRepository) { /* ... */ return; }
-    const originalText = 'Push Repository';
+    const originalText = pushRepoBtn.innerHTML;
     setButtonLoadingState(pushRepoBtn as HTMLButtonElement, true, originalText);
     
     try {
@@ -263,7 +292,7 @@ window.api.onShowChapterSelection((data) => {
         alert('Please select a repository to pull from.');
         return;
     }
-    const originalText = 'Pull Repository';
+    const originalText = pullRepoBtn.innerHTML;
     setButtonLoadingState(pullRepoBtn as HTMLButtonElement, true, originalText);
 
     try {

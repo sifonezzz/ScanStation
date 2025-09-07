@@ -60,7 +60,7 @@ export interface IScanstationAPI {
   // Chapter Screen Navigation & Creation
   onProjectDataForChapterScreen: (callback: (data: any) => void) => void;
   getChapters: (repoName: string, projectName: string) => void;
-  onChaptersLoaded: (callback: (chapters: Chapter[]) => void) => void;
+  onChapterListDataLoaded: (callback: (data: { coverPath: string, chapters: any[] }) => void) => void;
   onShowChapterSelection: (callback: (data: { repoName: string, projectName: string }) => void) => void;
   openCreateChapterWindow: (repoName: string, projectName: string) => void;
   goBackToProjects: (repoName: string, projectName: string) => void;
