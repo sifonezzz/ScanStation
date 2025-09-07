@@ -258,6 +258,8 @@ function showTypesetView(startingIndex: number) {
 
 // --- View Initializers ---
 function initTranslateView(startingIndex: number) {
+  const clearDrawingBtn = document.getElementById('clear-drawing-btn') as HTMLButtonElement;
+  const gotoPageInput = document.getElementById('goto-page-input') as HTMLInputElement;
   let currentPageIndex = startingIndex;
   const pageIndicator = document.getElementById('translate-page-indicator') as HTMLSpanElement;
   const saveBtn = document.getElementById('translate-save-btn') as HTMLButtonElement;
@@ -326,6 +328,18 @@ function initTranslateView(startingIndex: number) {
       }
     },
   };
+  // Listener for the new Go To Page input
+  
+
+  clearDrawingBtn.addEventListener('click', () => {
+    if (confirm('Are you sure you want to clear all drawings for this page?')) {
+        drawingData.lines = []; // Clear the data
+        redrawCanvas(); // Redraw the (now empty) canvas
+        saveData(); // Save the cleared data
+    }
+});
+
+// Listener for the new Go To Page input
 
   // This new function JUST updates the content instantly, with no animation
   const redrawCanvas = () => {
@@ -358,10 +372,9 @@ const loadPage = async (index: number, isInitialLoad: boolean = false) => {
     if (index < 0 || index >= pages.length) return; // Boundary check
     if (!isInitialLoad && index === currentPageIndex) return; // Prevent re-animating same page
 
-    // Get elements for animation
     const galleryContent = document.querySelector('.gallery-content');
 
-    // This function wraps the async data loading
+    // --- THIS IS THE FUNCTION DEFINITION YOU ARE MISSING ---
     const updateContent = async () => {
         // Only save if it's not the initial load AND the page is actually changing
         if (!isInitialLoad && pages[currentPageIndex] && currentPageIndex !== index) { 
@@ -377,9 +390,10 @@ const loadPage = async (index: number, isInitialLoad: boolean = false) => {
         drawingData = await window.api.getJsonContent(`${currentChapterPath}/data/TL Data/${page.fileName}_drawing.json`) || { lines: [] };
         redrawCanvas();
     };
+    // --- END OF MISSING FUNCTION DEFINITION ---
 
     if (isInitialLoad) {
-        await updateContent(); // Run logic instantly
+        await updateContent(); // This calls the function defined above
         // Just fade in the content for the first load
         gsap.fromTo([galleryContent, pageIndicator], { opacity: 0 }, { opacity: 1, duration: 0.3, ease: 'power1.out' });
         return;
@@ -396,7 +410,7 @@ const loadPage = async (index: number, isInitialLoad: boolean = false) => {
         opacity: 0,
         ease: 'power1.in',
         onComplete: async () => {
-            await updateContent(); // Update content while hidden
+            await updateContent(); // This also calls the function defined above
             gsap.fromTo([galleryContent, pageIndicator], // Animate in
                 { x: slideInX, opacity: 0 },
                 { duration: 0.2, x: '0%', opacity: 1, ease: 'power1.out' }
@@ -417,11 +431,24 @@ const loadPage = async (index: number, isInitialLoad: boolean = false) => {
   if (currentLine.length > 1) { drawingData.lines.push({ color: 'red', points: currentLine }); } saveData(); };
   canvas.addEventListener('mouseup', endDrawing);
   canvas.addEventListener('mouseleave', endDrawing);
+  gotoPageInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+          const pageNum = parseInt(gotoPageInput.value, 10);
+          if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= pages.length) {
+              loadPage(pageNum - 1); // 0-indexed
+              gotoPageInput.value = '';
+              gotoPageInput.blur();
+          } else {
+              gotoPageInput.value = '';
+          }
+      }
+  });
 
-  loadPage(startingIndex);
+  loadPage(startingIndex, true);
 }
 
 function initProofreadView(startingIndex: number) {
+  const gotoPageInput = document.getElementById('goto-page-input') as HTMLInputElement;
   let currentPageIndex = startingIndex;
   const pageIndicator = document.getElementById('proofread-page-indicator') as HTMLSpanElement;
   const saveBtn = document.getElementById('proofread-save-btn') as HTMLButtonElement;
@@ -546,11 +573,24 @@ const loadPage = async (index: number, isInitialLoad: boolean = false) => {
    
     }
   });
+  gotoPageInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+          const pageNum = parseInt(gotoPageInput.value, 10);
+          if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= pages.length) {
+              loadPage(pageNum - 1); // 0-indexed
+              gotoPageInput.value = '';
+              gotoPageInput.blur();
+          } else {
+              gotoPageInput.value = '';
+          }
+      }
+});
 
-  loadPage(startingIndex);
+  loadPage(startingIndex, true);
 }
 
 function initTypesetView(startingIndex: number) {
+  const gotoPageInput = document.getElementById('goto-page-input') as HTMLInputElement;
   let currentPageIndex = startingIndex;
   let currentImageType: 'cleaned' | 'raw' = 'cleaned';
 
@@ -575,7 +615,8 @@ function initTypesetView(startingIndex: number) {
       }
     },
   };
-
+  // Listener for the new Go To Page input
+  
   const redrawTypesetCanvas = (drawingData: DrawingData) => {
     if (!mainImage.clientWidth || !mainImage.clientHeight || !drawingData || !drawingData.lines) {
       ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
@@ -698,6 +739,18 @@ const loadPage = async (index: number, isInitialLoad: boolean = false) => {
       window.api.openFileInEditor({ editor, filePath });
     });
   });
+  gotoPageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        const pageNum = parseInt(gotoPageInput.value, 10);
+        if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= pages.length) {
+            loadPage(pageNum - 1); // loadPage is 0-indexed
+            gotoPageInput.value = ''; // Clear input
+            gotoPageInput.blur(); // Remove focus
+        } else {
+            gotoPageInput.value = ''; // Clear invalid input
+        }
+    }
+});
 
   loadPage(startingIndex, true);
 }

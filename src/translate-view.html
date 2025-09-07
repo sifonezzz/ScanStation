@@ -13,9 +13,12 @@
         <button id="translate-prev-btn">Previous</button>
         <button id="translate-next-btn">Next</button>
     </div>
-    <span class="page-indicator" id="translate-page-indicator">Page X of Y</span>
-    <div class="footer-action-buttons">
-        
-        <button id="translate-save-btn">Save</button>
+    <div class="page-controls-center">
+        <span class="page-indicator" id="translate-page-indicator">Page X of Y</span>
+        <input type="number" id="goto-page-input" class="goto-input" placeholder="Go..." />
     </div>
+    <div class="footer-action-buttons" style="display: flex; gap: 10px;">
+    <button id="clear-drawing-btn" style="background-color: #4a4d52;">Clear Drawing</button>
+    <button id="translate-save-btn">Save</button>
+</div>
 </div>
