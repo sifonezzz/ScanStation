@@ -321,8 +321,8 @@
         border-bottom: 1px solid #4a4d52;
     }
     #hero-project-cover {
-        width: 80px;
-        height: 114px; /* Maintain 512x728 aspect ratio */
+        width: 160px;
+        height: 228px;
         object-fit: cover;
         border-radius: 6px;
         box-shadow: 0 4px 8px rgba(0,0,0,0.3);
@@ -335,22 +335,31 @@
     }
     .hero-project-info h2 {
         margin: 0;
-        font-size: 24px;
+        font-size: 30px;
         color: white;
     }
     .hero-project-info span {
-        font-size: 14px;
+        font-size: 20px;
         color: #99aab5;
     }
     /* Style the create button (which we already rounded/colored) */
     #create-chapter-btn {
         padding: 10px 20px;
         font-size: 14px;
-        /* Make sure it's using our new color */
-        background-color: #3B82F6; 
+        background-color: #3B82F6;
+        /* --- ADDED --- */
+        border-radius: 50px;
+        font-weight: bold;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        transition: all 0.2s ease;
     }
     #create-chapter-btn:hover {
         background-color: #2563EB;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+    #create-chapter-btn:active {
+        transform: translateY(0px);
     }
 
 
@@ -425,7 +434,6 @@
     <div class="header">
         <div class="header-left">
             <a href="#" id="back-to-projects-btn" class="back-btn">&larr;</a>
-            <h1 id="project-name-header"></h1>
         </div>
     </div>
 

@@ -327,20 +327,7 @@ function initTranslateView(startingIndex: number) {
     },
   };
 
-  const loadPage = async (index: number) => {
-    if (index < 0 || index >= pages.length) return;
-    if (pages[currentPageIndex] && currentPageIndex !== index) { await saveData(); }
-    currentPageIndex = index;
-    const page = pages[currentPageIndex];
-    pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
-    const imagePath = `${currentChapterPath}/Raws/${page.fileName}`.replace(/\\/g, '/');
-    rawImage.src = `scanstation-asset:///${imagePath}`;
-    const textContent = await window.api.getFileContent(`${currentChapterPath}/data/TL Data/${page.fileName}.txt`);
-    translationText.value = textContent;
-    drawingData = await window.api.getJsonContent(`${currentChapterPath}/data/TL Data/${page.fileName}_drawing.json`) || { lines: [] };
-    redrawCanvas();
-  };
-
+  // This new function JUST updates the content instantly, with no animation
   const redrawCanvas = () => {
     if (!rawImage.clientWidth || !rawImage.clientHeight) return;
     const imgRect = rawImage.getBoundingClientRect();
@@ -364,6 +351,58 @@ function initTranslateView(startingIndex: number) {
       ctx.stroke();
     });
   };
+// This is the animated function, ONLY for Next/Prev button clicks
+const loadPage = async (index: number, isInitialLoad: boolean = false) => {
+    if (index < 0 || index >= pages.length) return; // Boundary check
+    if (!isInitialLoad && index === currentPageIndex) return; // Prevent re-animating same page
+
+    // Get elements for animation
+    const galleryContent = document.querySelector('.gallery-content');
+
+    // This function wraps the async data loading
+    const updateContent = async () => {
+        // Only save if it's not the initial load AND the page is actually changing
+        if (!isInitialLoad && pages[currentPageIndex] && currentPageIndex !== index) { 
+            await saveData();
+        }
+        currentPageIndex = index;
+        const page = pages[currentPageIndex];
+        pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
+        const imagePath = `${currentChapterPath}/Raws/${page.fileName}`.replace(/\\/g, '/');
+        rawImage.src = `scanstation-asset:///${imagePath}`; //
+        const textContent = await window.api.getFileContent(`${currentChapterPath}/data/TL Data/${page.fileName}.txt`);
+        translationText.value = textContent;
+        drawingData = await window.api.getJsonContent(`${currentChapterPath}/data/TL Data/${page.fileName}_drawing.json`) || { lines: [] };
+        redrawCanvas();
+    };
+
+    if (isInitialLoad) {
+        await updateContent(); // Run logic instantly
+        // Just fade in the content for the first load
+        gsap.fromTo([galleryContent, pageIndicator], { opacity: 0 }, { opacity: 1, duration: 0.3, ease: 'power1.out' });
+        return;
+    }
+
+    // --- Animation Logic (for Next/Prev) ---
+    const direction = index > currentPageIndex ? 'next' : 'prev';
+    const slideOutX = direction === 'next' ? '-25%' : '25%';
+    const slideInX = direction === 'next' ? '25%' : '-25%';
+
+    gsap.to([galleryContent, pageIndicator], {
+        duration: 0.2,
+        x: slideOutX,
+        opacity: 0,
+        ease: 'power1.in',
+        onComplete: async () => {
+            await updateContent(); // Update content while hidden
+            gsap.fromTo([galleryContent, pageIndicator], // Animate in
+                { x: slideInX, opacity: 0 },
+                { duration: 0.2, x: '0%', opacity: 1, ease: 'power1.out' }
+            );
+        }
+    });
+};
+
 
   const getMousePos = (e: MouseEvent) => ({ x: (e.clientX - canvas.getBoundingClientRect().left), y: (e.clientY - canvas.getBoundingClientRect().top) });
   nextBtn.addEventListener('click', () => loadPage(currentPageIndex + 1));
@@ -422,74 +461,73 @@ function initProofreadView(startingIndex: number) {
 
 
   
-  const loadPage = async (index: number) => {
+  // This new function JUST updates the content instantly
+
+// This is the animated function ONLY for Next/Prev
+const loadPage = async (index: number, isInitialLoad: boolean = false) => {
     if (index < 0 || index >= pages.length) return;
-    if (currentPageIndex !== index && pages[currentPageIndex]) { await saveAnnotations(); }
-    currentPageIndex = index;
-    const page = pages[currentPageIndex];
-    pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
+    if (!isInitialLoad && index === currentPageIndex) return;
 
-    // --- NEW LOGIC STARTS HERE ---
-    
-    // Clear images while loading to prevent showing the old page
-    rawImage.src = '';
-    tsImage.src = '';
+    const galleryContent = document.querySelector('.gallery-content');
 
-    const isSpread = /^\d+[-_]\d+\..+$/.test(page.fileName);
-
-    // Get raw image path (this logic correctly handles stitched spreads)
-    let rawImagePath: string;
-    if (isSpread) {
-        const result = await window.api.getStitchedRawSpread({
-            chapterPath: currentChapterPath,
-            pageFile: page.fileName
-        });
-        if (result.success) {
-            rawImagePath = result.filePath;
-        } else {
-            console.error('Failed to load spread:', result.error);
+    const updateContent = async () => {
+        if (!isInitialLoad && pages[currentPageIndex] && currentPageIndex !== index) {
+            await saveAnnotations();
         }
-    } else {
-        // For single pages, we get the path from our new, reliable handler
+        currentPageIndex = index;
+        const page = pages[currentPageIndex];
+        pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
+        // (All the original image loading logic [cite: 204-218])
+        rawImage.src = ''; tsImage.src = '';
+        const isSpread = /^\d+[-_]\d+\..+$/.test(page.fileName);
+        let rawImagePath: string;
+        if (isSpread) {
+            const result = await window.api.getStitchedRawSpread({ chapterPath: currentChapterPath, pageFile: page.fileName });
+            if (result.success) { rawImagePath = result.filePath; } else { console.error('Failed to load spread:', result.error); }
+        } else {
+            const imagePaths = await window.api.getProofreadImages({ chapterPath: currentChapterPath, pageFile: page.fileName });
+            if (imagePaths.success) { rawImagePath = imagePaths.rawPath; }
+        }
         const imagePaths = await window.api.getProofreadImages({ chapterPath: currentChapterPath, pageFile: page.fileName });
+        const timestamp = `?t=${Date.now()}`;
         if (imagePaths.success) {
-            rawImagePath = imagePaths.rawPath;
-        }
-    }
-    
-    // Get typeset image path using the new handler that finds the file regardless of extension
-    const imagePaths = await window.api.getProofreadImages({ chapterPath: currentChapterPath, pageFile: page.fileName });
-    const timestamp = `?t=${Date.now()}`; // Use timestamp to bust cache
-
-    if (imagePaths.success) {
-        // Check and set RAW path individually
-        if (rawImagePath) {
-            rawImage.src = `scanstation-asset:///${rawImagePath.replace(/\\/g, '/')}?${timestamp}`;
+            if (rawImagePath) { rawImage.src = `scanstation-asset:///${rawImagePath.replace(/\\/g, '/')}?${timestamp}`; } 
+            else { rawImage.src = ''; }
+            if (imagePaths.tsPath) { tsImage.src = `scanstation-asset:///${imagePaths.tsPath.replace(/\\/g, '/')}?${timestamp}`; } 
+            else { tsImage.src = ''; }
         } else {
-            rawImage.src = ''; // Ensure it's blank if no path was found
+            console.error('Failed to load proofread images:', imagePaths.error);
+            rawImage.src = ''; tsImage.src = '';
         }
-        
-        // Check and set TYPESET path individually (This fixes the 'null.replace' error)
-        if (imagePaths.tsPath) {
-            tsImage.src = `scanstation-asset:///${imagePaths.tsPath.replace(/\\/g, '/')}?${timestamp}`;
-        } else {
-            tsImage.src = ''; // Ensure it's blank if the path was null
-        }
-    } else {
-        // This 'else' block will now only catch critical errors (e.g., folder not readable)
-        console.error('Failed to load proofread images:', imagePaths.error);
-        rawImage.src = '';
-        tsImage.src = '';
-    }
-
-    // Keep the onerror handler in case the typeset file is missing or corrupted
-    tsImage.onerror = () => { tsImage.src = '';
+        tsImage.onerror = () => { tsImage.src = ''; };
+        const annotations = await window.api.getFileContent(`${currentChapterPath}/data/PR Data/${getBaseName(page.fileName)}_proof.txt`);
+        annotationsText.value = annotations;
     };
 
-    // Load annotations as before
-    const annotations = await window.api.getFileContent(`${currentChapterPath}/data/PR Data/${getBaseName(page.fileName)}_proof.txt`);
-    annotationsText.value = annotations;
-  };
+    if (isInitialLoad) {
+        await updateContent(); // Run instantly
+        gsap.fromTo([galleryContent, pageIndicator], { opacity: 0 }, { opacity: 1, duration: 0.3, ease: 'power1.out' });
+        return;
+    }
+
+    const direction = index > currentPageIndex ? 'next' : 'prev';
+    const slideOutX = direction === 'next' ? '-25%' : '25%';
+    const slideInX = direction === 'next' ? '25%' : '-25%';
+
+    gsap.to([galleryContent, pageIndicator], {
+        duration: 0.2,
+        x: slideOutX,
+        opacity: 0,
+        ease: 'power1.in',
+        onComplete: async () => {
+            await updateContent();
+            gsap.fromTo([galleryContent, pageIndicator],
+                { x: slideInX, opacity: 0 },
+                { duration: 0.2, x: '0%', opacity: 1, ease: 'power1.out' }
+            );
+        }
+    });
+};
   nextBtn.addEventListener('click', () => loadPage(currentPageIndex + 1));
   prevBtn.addEventListener('click', () => loadPage(currentPageIndex - 1));
   correctBtn.addEventListener('click', async () => {
@@ -590,17 +628,49 @@ function initTypesetView(startingIndex: number) {
     window.addEventListener('resize', () => redrawTypesetCanvas(drawingData));
   };
 
-  const loadPage = async (index: number) => {
+  // This new function JUST updates the content instantly
+
+// This is the animated function ONLY for Next/Prev
+const loadPage = async (index: number, isInitialLoad: boolean = false) => {
     if (index < 0 || index >= pages.length) return;
-    currentPageIndex = index;
-    const page = pages[currentPageIndex];
-    pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
-    
-    await updateImageView();
-    // THIS IS THE CORRECTED LINE: It now uses page.fileName instead of getBaseName
-    const translatedText = await window.api.getFileContent(`${currentChapterPath}/data/TL Data/${page.fileName}.txt`);
-    translationTextDiv.textContent = translatedText || 'No translation text found for this page.';
-  };
+    if (!isInitialLoad && index === currentPageIndex) return;
+
+    const galleryContent = document.querySelector('.gallery-content');
+
+    const updateContent = async () => {
+        // Typeset view doesn't have an auto-save function to call
+        currentPageIndex = index;
+        const page = pages[currentPageIndex];
+        pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
+        await updateImageView();
+        const translatedText = await window.api.getFileContent(`${currentChapterPath}/data/TL Data/${page.fileName}.txt`);
+        translationTextDiv.textContent = translatedText || 'No translation text found for this page.';
+    };
+
+    if (isInitialLoad) {
+        await updateContent(); // Run instantly
+        gsap.fromTo([galleryContent, pageIndicator], { opacity: 0 }, { opacity: 1, duration: 0.3, ease: 'power1.out' });
+        return;
+    }
+
+    const direction = index > currentPageIndex ? 'next' : 'prev';
+    const slideOutX = direction === 'next' ? '-25%' : '25%';
+    const slideInX = direction === 'next' ? '25%' : '-25%';
+
+    gsap.to([galleryContent, pageIndicator], {
+        duration: 0.2,
+        x: slideOutX,
+        opacity: 0,
+        ease: 'power1.in',
+        onComplete: async () => {
+            await updateContent();
+            gsap.fromTo([galleryContent, pageIndicator],
+                { x: slideInX, opacity: 0 },
+                { duration: 0.2, x: '0%', opacity: 1, ease: 'power1.out' }
+            );
+        }
+    });
+};
 
   showCleanedBtn.addEventListener('click', () => {
     currentImageType = 'cleaned';
@@ -627,5 +697,5 @@ function initTypesetView(startingIndex: number) {
     });
   });
 
-  loadPage(startingIndex);
+  loadPage(startingIndex, true);
 }

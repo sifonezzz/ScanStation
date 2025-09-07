@@ -124,7 +124,6 @@ window.addEventListener('DOMContentLoaded', () => {
   const settingsBtn = document.getElementById('settings-btn');
 
   // --- Elements for Chapter Screen ---
-  const projectNameHeader = document.getElementById('project-name-header');
   const chapterGrid = document.getElementById('chapter-grid');
   const createChapterBtn = document.getElementById('create-chapter-btn');
   const backBtn = document.getElementById('back-to-projects-btn');
@@ -515,16 +514,13 @@ function showChapterSelection(repoName: string, projectName: string) {
 
   // Get elements from the existing chapter screen to populate them
   const chapterScreen = document.getElementById('chapter-screen');
-  const projectNameHeader = document.getElementById('project-name-header');
   const chapterGrid = document.getElementById('chapter-grid');
 
-  if (!chapterScreen || !projectNameHeader || !chapterGrid) {
+  if (!chapterScreen || !chapterGrid) {
     console.error('Could not find required elements to show chapter screen.');
     return;
   }
 
-  // 1. Set the header title [cite: 877]
-  projectNameHeader.textContent = projectName;
   
   // 2. Clear the grid and show a loading message [cite: 878]
   chapterGrid.innerHTML = `<p style="color: #99aab5; text-align: center;">Loading chapters...</p>`;
