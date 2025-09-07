@@ -15,6 +15,8 @@
       background-repeat: no-repeat; /* <-- ADD THIS LINE */
       height: 100vh;
     }
+
+    
     .header {
       display: flex;
       justify-content: space-between;
@@ -43,7 +45,7 @@
       padding: 8px 16px;
       font-size: 14px;
       border: none;
-      border-radius: 4px;
+      border-radius: 50px;
       cursor: pointer;
       outline: none;
       font-weight: bold;
@@ -56,7 +58,7 @@
       background-color: #5a5d62; 
     }
     #add-repo-btn, #create-project-btn, #pull-repo-btn, #create-chapter-btn { 
-      background-color: #7289da;
+      background-color: #3B82F6;
       color: white; 
     }
     #add-repo-btn:hover, #create-project-btn:hover, #pull-repo-btn:hover, #create-chapter-btn:hover { 
@@ -64,7 +66,7 @@
     }
     #repo-dropdown { 
         padding: 8px;
-        font-size: 14px; border-radius: 4px; 
+        font-size: 14px; border-radius: 50px;
         background-color: #23272a; color: white; border: 1px solid #4a4d52;
     }
 
@@ -83,7 +85,7 @@
     .modal-content input { width: 100%; padding: 10px; margin: 15px 0; box-sizing: border-box; }
     .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
     #modal-cancel-btn, #token-cancel-btn { background-color: #4a4d52; color: white; }
-    #modal-pull-btn, #token-save-btn { background-color: #43b581; color: white; }
+    #modal-pull-btn, #token-save-btn { background-color: #10B981; color: white; }
 
     /* Project Screen Styles */
     #project-grid {
@@ -126,10 +128,10 @@
       border-radius: 50px;
       cursor: pointer; font-weight: bold; color: white; font-size: 14px;
     }
-    .delete-btn { background-color: #f04747; }
-    .edit-project-btn { background-color: #43b581; }
+    .delete-btn { background-color: #EF4444; }
+    .edit-project-btn { background-color: #10B981; }
     .edit-mode .project-card-overlay { display: flex; }
-    #push-repo-btn { background-color: #43b581; color: white; }
+    #push-repo-btn { background-color: #10B981; color: white; }
 
     /* Chapter Screen Styles */
     .back-btn { 
@@ -182,7 +184,7 @@
         color: white;
     }
     #git-push-btn { 
-        background-color: #43b581; 
+        background-color: #10B981; 
         color: white;
     }
     #git-changed-files { 
@@ -216,7 +218,7 @@
         color: white; 
     }
     #git-commit-btn { 
-        background-color: #7289da; 
+        background-color: #3B82F6; 
         color: white;
     }
     .git-instructions {
@@ -274,8 +276,41 @@
       transition: transform 0.2s ease, background-color 0.2s ease;
     }
 
+    /* --- Styles for the new Push/Pull Group --- */
+    .git-sync-group {
+      display: flex;
+      border-radius: 50px; /* Container matches the pill shape */
+      overflow: hidden; /* This is what clips the inner button corners */
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Adds a subtle shadow */
+    }
+
+    /* Target the buttons *inside* our new group */
+    .git-sync-group button {
+      display: flex; /* Makes icon and text align */
+      align-items: center;
+      gap: 6px;
+      border-radius: 0; /* Remove individual radius; the parent handles it */
+      transition: all 0.2s ease; /* Add smooth transitions for hover */
+    }
+
+    /* Style for the SVGs inside the buttons */
+    .git-sync-group button svg {
+      stroke-width: 3px; /* Makes icons nice and bold */
+    }
+
+    /* Add back the hover states from other buttons */
+    #pull-repo-btn:hover { background-color: #677bc4; }
+    #push-repo-btn:hover { background-color: #3aa171; }
+
+    /* Give the buttons a "lift" on hover */
+    .header button:hover {
+      transform: translateY(-1px);
+    }
+    .header button:active {
+      transform: translateY(0px); /* Press back down on click */
+    }
+
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 </head>
 <body>
   <div id="project-screen">
@@ -283,8 +318,16 @@
       <div class="header-left">
         <h1>Your Projects</h1>
         <select id="repo-dropdown"></select>
-        <button id="pull-repo-btn">Pull Repository</button>
-        <button id="push-repo-btn">Push Repository</button>
+        <div class="git-sync-group">
+          <button id="pull-repo-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m-7-7 7 7 7-7"/></svg>
+            <span>Pull</span>
+          </button>
+          <button id="push-repo-btn">
+            <span>Push</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m-7 7 7-7 7 7"/></svg>
+          </button>
+        </div>
       </div>
       <div class="header-buttons">
         <button id="settings-btn">Settings</button>
@@ -321,7 +364,7 @@
         <input type="text" id="git-name-input" placeholder="Your GitHub Username" style="margin-bottom: 10px;">
         <input type="email" id="git-email-input" placeholder="your_email@example.com">
         <div class="modal-buttons">
-            <button id="git-identity-save-btn" style="background-color: #43b581; color: white;">Save and Continue</button>
+            <button id="git-identity-save-btn" style="background-color: #10B981; color: white;">Save and Continue</button>
         </div>
     </div>
   </div>

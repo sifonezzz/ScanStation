@@ -16,6 +16,8 @@
             background-repeat: no-repeat;
             height: 100vh;
         }
+
+        
         .header { display: flex; justify-content: space-between;
         align-items: center; padding: 16px 24px; background-color: #2c2f33; border-bottom: 1px solid #4a4d52;
         }
@@ -25,7 +27,7 @@
         }
         .header h1 { margin: 0; font-size: 20px;
         }
-        #create-chapter-btn { padding: 8px 16px; font-size: 14px; background-color: #7289da; color: white;
+        #create-chapter-btn { padding: 8px 16px; font-size: 14px; background-color: #3B82F6; color: white;
         border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         #chapter-grid { display: flex;
         flex-direction: column; gap: 12px; padding: 24px; }
@@ -46,7 +48,7 @@
         cursor: pointer; font-weight: bold; }
         #git-status-btn { background-color: #4a4d52; color: white;
         }
-        #git-push-btn { background-color: #43b581; color: white;
+        #git-push-btn { background-color: #10B981; color: white;
         }
         #git-changed-files { background-color: #23272a; border-radius: 4px; padding: 10px; min-height: 50px;
             font-family: monospace;
@@ -55,7 +57,7 @@
         }
         #git-commit-message { flex-grow: 1; padding: 8px; border-radius: 4px; border: 1px solid #4a4d52;
         background-color: #23272a; color: white; }
-        #git-commit-btn { background-color: #7289da; color: white;
+        #git-commit-btn { background-color: #3B82F6; color: white;
         }
         .git-instructions {
             font-size: 12px;
@@ -65,7 +67,7 @@
         }
 
         .header-right { display: flex; align-items: center; gap: 10px; }
-        .action-btn { transition: transform 0.1s, background-color 0.2s; transition: background-color 0.2s; display: flex; align-items: center; gap: 8px; background-color: #43b581; color: white; padding: 8px 16px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .action-btn { transition: transform 0.1s, background-color 0.2s; transition: background-color 0.2s; display: flex; align-items: center; gap: 8px; background-color: #10B981; color: white; padding: 8px 16px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .action-btn svg {
             width: 18px; /* Sets the icon size */
             height: 18px;
@@ -84,8 +86,8 @@
         }
         
         
-        #translate-btn { background-color: #7289da; } /* Pastel Blue/Purple */
-        #proofread-btn { background-color: #43b581; } /* Pastel Green */
+        #translate-btn { background-color: #3B82F6; } /* Pastel Blue/Purple */
+        #proofread-btn { background-color: #10B981; } /* Pastel Green */
         #typeset-btn { background-color: #faa61a; } /* Pastel Orange */
 
         #translate-btn:hover { background-color: #677bc4; }
@@ -152,7 +154,7 @@
         .page-status-item .page-name { font-weight: bold; }
         .page-status-item .status-tags { display: flex; gap: 8px; font-size: 12px; }
         .status-tag { padding: 2px 4px; border-radius: 3px; background-color: #4a4d52; }
-        .status-tag.checked { background-color: #43b581; color: white; }
+        .status-tag.checked { background-color: #10B981; color: white; }
         .status-tag.circled { border: 1px solid #faa61a; background-color: transparent; color: #faa61a; }
         /* --- Gallery View Styles --- */
         #gallery-view-container { width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -223,7 +225,7 @@
             font-weight: bold;
         }
         #proofread-correct-btn {
-            background-color: #43b581;
+            background-color: #10B981;
         }
         .proofread-layout .tools-panel { width: 250px; }
         .page-status-item.clickable {
@@ -293,7 +295,7 @@
         }
         .progress-bar-foreground {
             height: 100%;
-            background-color: #43b581;
+            background-color: #10B981;
             border-radius: 4px;
             transition: width 0.5s ease-in-out;
             text-align: center;
@@ -320,8 +322,8 @@
             cursor: pointer;
         }
         .switcher-btn.active {
-            background-color: #7289da;
-            border-color: #7289da;
+            background-color: #3B82F6;
+            border-color: #3B82F6;
             color: white;
         }
         .heal-btn {
@@ -352,7 +354,7 @@
 
         /* This adds a hover effect to the scrollbar handle */
         #pages-sidebar::-webkit-scrollbar-thumb:hover {
-            background-color: #7289da; /* Changes color on hover to your app's primary accent color */
+            background-color: #3B82F6; /* Changes color on hover to your app's primary accent color */
         }
 
         .header-left {
@@ -447,7 +449,7 @@
             </div>
             <div class="modal-buttons" style="margin-top: 20px;">
                 <button id="rename-cancel-btn" style="background-color: #4a4d52; color: white;">Cancel</button>
-                <button id="rename-confirm-btn" style="background-color: #43b581; color: white;">Rename Files</button>
+                <button id="rename-confirm-btn" style="background-color: #10B981; color: white;">Rename Files</button>
             </div>
         </div>
     </div>

@@ -88,7 +88,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         hasPat = await window.api.getPatStatus();
         if (hasPat) {
             setTokenBtn.textContent = 'Remove Token';
-            (setTokenBtn as HTMLButtonElement).style.backgroundColor = '#f04747'; // Red
+            (setTokenBtn as HTMLButtonElement).style.backgroundColor = '#EF4444'; // Red
         } else {
             setTokenBtn.textContent = 'Set Token';
             (setTokenBtn as HTMLButtonElement).style.backgroundColor = ''; // Default

@@ -164,7 +164,13 @@ window.api.onShowChapterSelection((data) => {
         card.addEventListener('click', () => {
             if (!isEditMode) {
                 createRectangleExpandAnimation(card, () => {
-                    window.api.openProject(currentRepoName, currentProjectName, chapter.name);
+                    // This callback now runs *after* the animation starts
+                    window.api.openProject({
+                        repoName: currentRepoName, 
+                        projectName: currentProjectName, 
+                        chapterName: chapter.name
+                        // We no longer send the 'rect' data
+                    });
                 });
             }
         });
@@ -407,58 +413,7 @@ window.api.onShowChapterSelection((data) => {
   checkAndSetGitIdentity();
 }); // <-- This closes the DOMContentLoaded event listener
 
-function createRectangleExpandAnimation(chapterCard: HTMLElement, callback: () => void) {
-  // Get position and dimensions of the clicked chapter card
-  const rect = chapterCard.getBoundingClientRect();
-  
-  // Create overlay with rectangle
-  const overlay = document.createElement('div');
-  overlay.style.position = 'fixed';
-  overlay.style.top = '0';
-  overlay.style.left = '0';
-  overlay.style.width = '100%';
-  overlay.style.height = '100%';
-  overlay.style.zIndex = '1000';
-  overlay.style.pointerEvents = 'none';
-  overlay.style.overflow = 'hidden';
-  
-  const rectangle = document.createElement('div');
-  rectangle.style.position = 'absolute';
-  rectangle.style.top = `${rect.top}px`;
-  rectangle.style.left = `${rect.left}px`;
-  rectangle.style.width = `${rect.width}px`;
-  rectangle.style.height = `${rect.height}px`;
-  rectangle.style.backgroundColor = '#3b3e44';
-  rectangle.style.borderRadius = '8px'; // Match the chapter card's border radius
-  
-  overlay.appendChild(rectangle);
-  document.body.appendChild(overlay);
-  
-  // Animate the rectangle expanding to cover the entire screen
-  gsap.to(rectangle, {
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    borderRadius: 0, // Remove border radius as it expands
-    duration: 0.6,
-    ease: 'power2.inOut',
-    onComplete: () => {
-      // Execute the callback (open chapter workspace)
-      callback();
-      
-      // Fade out the overlay
-      gsap.to(overlay, {
-        opacity: 0,
-        duration: 0.3,
-        delay: 0.1,
-        onComplete: () => {
-          document.body.removeChild(overlay);
-        }
-      });
-    }
-  });
-}
+
 
 async function checkAndSetGitIdentity() {
     const identity = await window.api.getGitIdentity();
@@ -552,4 +507,49 @@ function showChapterSelection(repoName: string, projectName: string) {
   // This replaces all previous GSAP logic and opacity settings [cite: 880, 881]
   chapterScreen.style.display = 'block';
   chapterScreen.style.opacity = '1';
+}
+
+function createRectangleExpandAnimation(chapterCard: HTMLElement, callback: () => void) {
+  // Get position and dimensions of the clicked chapter card
+  const rect = chapterCard.getBoundingClientRect();
+  // Create overlay with rectangle
+  const overlay = document.createElement('div');
+  overlay.style.position = 'fixed';
+  overlay.style.top = '0';
+  overlay.style.left = '0';
+  overlay.style.width = '100%';
+  overlay.style.height = '100%';
+  overlay.style.zIndex = '1000';
+  overlay.style.pointerEvents = 'none';
+  overlay.style.overflow = 'hidden';
+  
+  const rectangle = document.createElement('div');
+  rectangle.style.position = 'absolute';
+  rectangle.style.top = `${rect.top}px`;
+  rectangle.style.left = `${rect.left}px`;
+  rectangle.style.width = `${rect.width}px`;
+  rectangle.style.height = `${rect.height}px`;
+  rectangle.style.backgroundColor = '#3b3e44'; // Use the card hover color
+  rectangle.style.borderRadius = '8px'; // Match the chapter card's border radius
+  
+  overlay.appendChild(rectangle);
+  document.body.appendChild(overlay);
+  // Animate the rectangle expanding to cover the entire screen
+  gsap.to(rectangle, {
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    borderRadius: 0, // Remove border radius as it expands
+    duration: 0.6,
+    ease: 'power2.inOut',
+    onComplete: () => {
+          // 1. Execute the callback (which navigates the window)
+          callback();
+          
+          // 2. DO NOTHING ELSE. 
+          // We leave the opaque rectangle on-screen. The page navigation
+          // will destroy it automatically. This hides the "hard cut" of the load.
+        }
+  });
 }

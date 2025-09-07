@@ -2,6 +2,7 @@ import type { IScanstationAPI, Editor } from './types';
 import translateViewHtml from './translate-view.html';
 import proofreadViewHtml from './proofread-view.html';
 import typesetViewHtml from './typeset-view.html';
+import { gsap } from 'gsap';
 
 function getBaseName(fileName: string): string {
     const parts = fileName.split('.');
@@ -60,6 +61,17 @@ window.addEventListener('DOMContentLoaded', () => {
         await loadAndRenderPageStatus();
         showHomeView();
         window.api.startWatchingChapter(currentChapterPath);
+
+        // --- NEW ANIMATION LOGIC ---
+        // --- NEW: Simple Fade-In Entry Animation ---
+        // The page starts invisible (set by default CSS or just set here)
+        const pageBody = document.body;
+        gsap.fromTo(pageBody, 
+            { opacity: 0 },
+            { opacity: 1, duration: 0.3, ease: 'power1.inOut' } // Simple 0.3s fade-in
+        );
+        // --- END OF NEW ANIMATION LOGIC ---
+        // --- END OF NEW ANIMATION LOGIC ---
     });
 
     window.api.onFileAdded(() => {

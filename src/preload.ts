@@ -5,7 +5,7 @@ import type { IScanstationAPI, Project, Chapter } from './types';
 const api: IScanstationAPI = {
   // --- Main Window ---
   onProjectsLoaded: (callback: (projects: Project[]) => void) => ipcRenderer.on('projects-loaded', (_event, projects) => callback(projects)),
-  openProject: (repoName: string, projectName: string, chapterName: string) => ipcRenderer.send('open-project', { repoName, projectName, chapterName }),
+  openProject: (data: any) => ipcRenderer.send('open-project', data),
   deleteProject: (repoName: string, projectName: string) => ipcRenderer.invoke('delete-project', { repoName, projectName }),
   openEditProjectWindow: (repoName: string, projectName: string) => ipcRenderer.send('open-edit-project-window', { repoName, projectName }),
 

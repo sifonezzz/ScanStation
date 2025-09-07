@@ -11,7 +11,13 @@ export interface Chapter {
 export interface IScanstationAPI {
   // Main Window
   onProjectsLoaded: (callback: (projects: Project[]) => void) => void;
-  openProject: (repoName: string, projectName: string, chapterName: string) => void;
+  openProject: (data: { 
+    repoName: string; 
+    projectName: string; 
+    chapterName: string; 
+    rect?: { top: number; left: number; width: number; height: number; }; 
+  }) => void;
+
   deleteProject: (repoName: string, projectName: string) => Promise<{ success: boolean }>;
   openEditProjectWindow: (repoName: string, projectName: string) => void;
 

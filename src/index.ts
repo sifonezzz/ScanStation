@@ -691,19 +691,26 @@ ipcMain.on('submit-project-creation', async (_, { repoName, name, path: coverPat
   }
 });
 
-ipcMain.on('open-project', (_, { repoName, projectName, chapterName }) => {
+ipcMain.on('open-project', (_, data: { repoName: string, projectName: string, chapterName: string, rect?: any }) => {
     const mainWindow = BrowserWindow.getAllWindows()[0];
     if (mainWindow) {
         
+        const { repoName, projectName, chapterName, rect } = data; // Unpack all data
         const chapterPath = path.join(getStoragePath(), repoName, projectName, chapterName);
         
-        // 1. Load the correct chapter screen HTML file
+        // 1. Load the chapter screen HTML file
         mainWindow.loadURL(CHAPTER_SCREEN_WINDOW_WEBPACK_ENTRY);
 
-        // 2. After the page is loaded, send the data it needs
+        // 2. After the page is loaded, send ALL data it needs (including the animation rect)
         mainWindow.webContents.once('dom-ready', () => {
             mainWindow.setTitle(`${projectName} / ${chapterName}`);
-            mainWindow.webContents.send('project-data-for-chapter-screen', { repoName, projectName, chapterName, chapterPath });
+            mainWindow.webContents.send('project-data-for-chapter-screen', { 
+                repoName, 
+                projectName, 
+                chapterName, 
+                chapterPath,
+                animationRect: rect // Forward the rect data
+            });
         });
     }
 });
