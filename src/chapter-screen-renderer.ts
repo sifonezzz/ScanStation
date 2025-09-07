@@ -106,34 +106,37 @@ window.addEventListener('DOMContentLoaded', () => {
 
   proofreadBtn.addEventListener('click', async () => {
     await activeView.saveData();
-    
 
     const originalText = proofreadBtn.innerHTML;
     proofreadBtn.innerHTML = 'Loading...';
     proofreadBtn.setAttribute('disabled', 'true');
-
-
     document.body.style.cursor = 'wait';
-    const spreadPages = pages.filter(p => /^\d+[-_]\d+\..+$/.test(p.fileName));
-    
-    // Wait for all spreads to be pre-loaded and cached
-    await Promise.all(spreadPages.map(spread => 
-        window.api.getStitchedRawSpread({
-            chapterPath: currentChapterPath,
-            pageFile: spread.fileName
-        })
-    ));
 
-    const firstAnnotatedPage = pages.findIndex(p => p.status.PR === 'annotated');
-    showProofreadView(firstAnnotatedPage >= 0 ? firstAnnotatedPage : 0);
-    
-    document.body.style.cursor = 'default';
-    
- 
-    proofreadBtn.innerHTML = originalText;
-    proofreadBtn.removeAttribute('disabled');
+    try {
+      const spreadPages = pages.filter(p => /^\d+[-_]\d+\..+$/.test(p.fileName));
+      
+      // Wait for all spreads to be pre-loaded and cached
+      await Promise.all(spreadPages.map(spread => 
+          window.api.getStitchedRawSpread({
+              chapterPath: currentChapterPath,
+              pageFile: spread.fileName
+          })
+      ));
 
-  });
+      const firstAnnotatedPage = pages.findIndex(p => p.status.PR === 'annotated');
+      showProofreadView(firstAnnotatedPage >= 0 ? firstAnnotatedPage : 0);
+    
+    } catch (error) {
+      console.error('Failed to preload spreads for proofread view:', error);
+      alert(`An error occurred while loading the page: ${error.message || error}`);
+    
+    } finally {
+      document.body.style.cursor = 'default';
+      proofreadBtn.innerHTML = originalText;
+      proofreadBtn.removeAttribute('disabled');
+    }
+    
+});
     typesetBtn.addEventListener('click', async () => {
         await activeView.saveData();
         showTypesetView(0);
@@ -258,6 +261,7 @@ function showTypesetView(startingIndex: number) {
 
 // --- View Initializers ---
 function initTranslateView(startingIndex: number) {
+  let isSavingTranslation = false; // <-- This is the new mutex lock
   const clearDrawingBtn = document.getElementById('clear-drawing-btn') as HTMLButtonElement;
   const gotoPageInput = document.getElementById('goto-page-input') as HTMLInputElement;
   let currentPageIndex = startingIndex;
@@ -286,14 +290,37 @@ function initTranslateView(startingIndex: number) {
   });
 
   const saveData = async () => {
+    // --- START OF FIX ---
+    // If a save is already happening, skip this call.
+    if (isSavingTranslation) {
+      console.log('Save skipped: another save is already in progress.');
+      return; 
+    }
+    // --- END OF FIX ---
+
     const pageFile = pages[currentPageIndex]?.fileName;
     if (!pageFile) return;
-    const result = await window.api.saveTranslationData({ chapterPath: currentChapterPath, pageFile, text: translationText.value, drawingData: drawingData });
-    if (result.success) {
-      pages[currentPageIndex].status = { ...pages[currentPageIndex].status, ...result.newStatus };
-      renderSidebar();
+
+    // --- START OF FIX ---
+    try {
+        isSavingTranslation = true; // Set the lock
+        // --- END OF FIX ---
+
+        const result = await window.api.saveTranslationData({ chapterPath: currentChapterPath, pageFile, text: translationText.value, drawingData: drawingData });
+        if (result.success) {
+            pages[currentPageIndex].status = { ...pages[currentPageIndex].status, ...result.newStatus };
+            renderSidebar();
+        }
+
+    // --- START OF FIX ---
+    } catch (error) {
+        console.error('Failed to save translation data:', error);
+        alert(`Error saving page data: ${error.message}`);
+    } finally {
+        isSavingTranslation = false; // ALWAYS release the lock
     }
-  };
+    // --- END OF FIX ---
+};
 
   // NEW: Add an event listener to the text area for auto-saving
   translationText.addEventListener('input', () => {

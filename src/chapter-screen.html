@@ -488,6 +488,47 @@
         gap: 10px; 
         margin-top: 10px; 
     }
+    /* Add these new rules to your <style> block */
+
+        /* 1. Shared styles for padding, font, and transitions */
+        #rename-utility-modal .modal-buttons button {
+            padding: 10px 20px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s ease; /* Smooth transition for all properties */
+            border: 2px solid transparent; /* Reserve space for the border */
+        }
+
+        /* 2. Style the "Cancel" button as a secondary "ghost" button */
+        #rename-cancel-btn {
+            background-color: transparent;
+            color: #99aab5;
+            border-color: #4a4d52; /* Use the standard gray border */
+        }
+
+        #rename-cancel-btn:hover {
+            background-color: #4a4d52; /* Fill in on hover */
+            color: white;
+        }
+
+        /* 3. Style the "Confirm" button as the primary action */
+        #rename-confirm-btn {
+            background-color: #10B981; /* App's existing green success color */
+            color: white;
+            border-color: #10B981; 
+        }
+
+        #rename-confirm-btn:hover {
+            background-color: #059669; /* Darker green from proofread hover state [cite: 318] */
+            border-color: #059669;
+        }
+
+        /* 4. Add the "press down" effect on click [cite: 310] */
+        #rename-utility-modal .modal-buttons button:active {
+            transform: translateY(1px);
+        }
     /* Form styles needed by the modal */
     .form-group { 
         margin-bottom: 15px; 
@@ -568,8 +609,8 @@
                 </select>
             </div>
             <div class="modal-buttons" style="margin-top: 20px;">
-                <button id="rename-cancel-btn" style="background-color: #4a4d52; color: white;">Cancel</button>
-                <button id="rename-confirm-btn" style="background-color: #10B981; color: white;">Rename Files</button>
+                <button id="rename-cancel-btn">Cancel</button>
+                <button id="rename-confirm-btn">Rename Files</button>
             </div>
         </div>
     </div>
