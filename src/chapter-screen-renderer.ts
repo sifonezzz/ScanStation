@@ -350,7 +350,9 @@ function initTranslateView(startingIndex: number) {
       for (let i = 1; i < line.points.length; i++) { ctx.lineTo(line.points[i].x * canvas.width, line.points[i].y * canvas.height); }
       ctx.stroke();
     });
+    
   };
+  rawImage.onload = redrawCanvas;
 // This is the animated function, ONLY for Next/Prev button clicks
 const loadPage = async (index: number, isInitialLoad: boolean = false) => {
     if (index < 0 || index >= pages.length) return; // Boundary check
@@ -407,7 +409,7 @@ const loadPage = async (index: number, isInitialLoad: boolean = false) => {
   const getMousePos = (e: MouseEvent) => ({ x: (e.clientX - canvas.getBoundingClientRect().left), y: (e.clientY - canvas.getBoundingClientRect().top) });
   nextBtn.addEventListener('click', () => loadPage(currentPageIndex + 1));
   prevBtn.addEventListener('click', () => loadPage(currentPageIndex - 1));
-  rawImage.onload = redrawCanvas;
+
   window.addEventListener('resize', redrawCanvas);
   canvas.addEventListener('mousedown', (e) => { isDrawing = true; currentLine = []; const pos = getMousePos(e); currentLine.push({ x: pos.x / canvas.width, y: pos.y / canvas.height }); });
   canvas.addEventListener('mousemove', (e) => { if (!isDrawing) return; const pos = getMousePos(e); currentLine.push({ x: pos.x / canvas.width, y: pos.y / canvas.height }); ctx.beginPath(); const lastPoint = currentLine[currentLine.length - 2]; if(!lastPoint) return; ctx.moveTo(lastPoint.x * canvas.width, lastPoint.y * canvas.height); ctx.lineTo(pos.x, pos.y); ctx.stroke(); });
