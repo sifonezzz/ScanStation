@@ -1,11 +1,11 @@
 <div class="gallery-content">
     <div class="image-viewer">
-        <img id="translate-raw-image" src="" alt="Raw Page" />
-        <canvas id="drawing-canvas"></canvas>
+    <span class="zoom-indicator">Ctrl + Scroll to Zoom</span>
+    <div class="zoom-container" id="typeset-image-container">
+        <img id="typeset-image" src="" alt="Page Image" />
     </div>
-    <div class="tools-panel">
-        <textarea id="translation-text" placeholder="1. text...&#10;2. text..."></textarea>
-    </div>
+    <canvas id="typeset-drawing-canvas" style="position: absolute; pointer-events: none;"></canvas>
+</div>
 </div>
 
 <div class="gallery-footer">

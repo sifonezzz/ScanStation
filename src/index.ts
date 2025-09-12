@@ -1,5 +1,5 @@
 import { AppStore } from './settings';
-import { app, BrowserWindow, ipcMain, dialog, protocol, session, shell, Menu, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, protocol, session, shell, Menu, screen, nativeImage, clipboard} from 'electron';
 import path from 'path';
 import fs from 'fs-extra'; // This stays the same for your existing code
 import * as fsPromises from 'fs/promises'; // Add this line
@@ -67,6 +67,11 @@ function createSplashWindow() {
   splashWindow = null;
 });
 }
+function initializeDefaultSettings() {
+    if (getSetting('hideFileExtensionsInSidebar') === undefined) {
+        setSetting('hideFileExtensionsInSidebar', true); // Enabled by default
+    }
+}
 
 
 function updateSplashStatus(message: string) {
@@ -103,7 +108,12 @@ function openSettingsWindow() {
 }
 
 
-
+ipcMain.on('open-chapter-subfolder', (event, { chapterPath, subfolder }) => {
+  if (chapterPath && subfolder) {
+    const fullPath = path.join(chapterPath, subfolder);
+    shell.openPath(fullPath).catch(err => console.error('Failed to open subfolder:', err));
+  }
+});
 ipcMain.on('open-settings-window', openSettingsWindow);
 ipcMain.on('close-settings-window', () => {
     if (settingsWindow) settingsWindow.close();
@@ -130,6 +140,15 @@ ipcMain.handle('select-editor-path', async () => {
 ipcMain.handle('set-editor-path', (_, { editor, path }: { editor: string, path: string }) => {
     const key = `${editor}Path` as keyof AppStore;
     setSetting(key, path);
+});
+
+ipcMain.handle('get-setting', (event, key: keyof AppStore) => {
+  return getSetting(key);
+});
+
+// Handler to set a setting value
+ipcMain.handle('set-setting', (event, { key, value }: { key: keyof AppStore; value: any }) => {
+  setSetting(key, value);
 });
 
 ipcMain.on('start-watching-chapter', (event, chapterPath: string) => {
@@ -578,46 +597,67 @@ ipcMain.handle('rename-files-in-folder', async (_, { chapterPath, folderName }) 
 });
 
 ipcMain.on('open-create-project-window', (_, repoName) => openCreateProjectWindow(repoName));
-ipcMain.on('select-cover-image', async (event) => {
-  const { canceled, filePaths } = await dialog.showOpenDialog({
+ipcMain.on('select-cover-image', (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  dialog.showOpenDialog(window, {
+    title: 'Select Cover Image',
     properties: ['openFile'],
-    filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp'] }],
+    filters: [
+      { name: 'Images', extensions: ['jpg', 'png', 'jpeg', 'webp'] } // Added 'webp'
+    ]
+  }).then(result => {
+    if (!result.canceled && result.filePaths.length > 0) {
+      event.sender.send('cover-image-selected', result.filePaths[0]);
+    }
+  }).catch(err => {
+    console.error('File selection error:', err);
   });
-  if (!canceled && filePaths.length > 0) {
-    event.sender.send('cover-image-selected', filePaths[0]);
-  }
 });
 
 ipcMain.on('cancel-project-creation', () => {
   if (createProjectWindow) createProjectWindow.close();
 });
 
-ipcMain.handle('open-file-in-editor', async (_, { editor, filePath }: { editor: string, filePath: string }) => {
-    const key = `${editor}Path` as keyof AppStore;
-    const editorPath = getSetting<string>(key);
+ipcMain.handle('open-file-in-editor', async (event, { editor, chapterPath, folder, baseFileName }) => {
+  // 1. Construct the full path to the target folder (e.g., ".../Project A/Chapter 1/Raws Cleaned")
+  const targetFolder = path.join(chapterPath, folder);
 
+  try {
+    // 2. Find the full filename in the directory
+    if (!fs.existsSync(targetFolder)) {
+      throw new Error(`The folder "${folder}" does not exist.`);
+    }
+    const files = fs.readdirSync(targetFolder);
+    const fullFileName = files.find(file => file.startsWith(baseFileName));
+
+    if (!fullFileName) {
+      throw new Error(`File starting with "${baseFileName}" not found in "${folder}".`);
+    }
+
+    const fullPath = path.join(targetFolder, fullFileName);
+
+    // 3. Get the saved path for the selected editor
+    const editorPath = getSetting<string>(`${editor}Path` as keyof import('./settings').AppStore);
     if (!editorPath) {
-        dialog.showMessageBox({
-            type: 'warning',
-            title: 'Editor Path Not Set',
-            message: `You haven't linked your programs. Please do so on the settings screen.`
-        });
-        return { success: false, error: 'Editor path not set.' };
+      throw new Error(`The path for ${editor.charAt(0).toUpperCase() + editor.slice(1)} is not set in Settings.`);
     }
 
-    try {
-        if (!await fs.pathExists(editorPath)) throw new Error(`Executable not found at: ${editorPath}`);
-        if (!await fs.pathExists(filePath)) throw new Error(`Image file not found at: ${filePath}`);
+    // 4. Execute the editor with the file path as an argument
+    execFile(editorPath, [fullPath], (err) => {
+      if (err) {
+        // This error is logged but not sent to the user, as the user-facing error
+        // is more about whether the path is set, not if the program fails to launch.
+        console.error(`Error trying to open ${fullPath} in ${editor}:`, err);
+      }
+    });
 
-        execFile(editorPath, [filePath], (error) => {
-            if (error) throw error;
-        });
-        return { success: true };
-    } catch (error) {
-        console.error(`Failed to open ${filePath} in ${editor}:`, error);
-        dialog.showErrorBox('Error Opening File', `Could not open file in ${editor}.\n\nError: ${error.message}`);
-        return { success: false, error: error.message };
-    }
+    return { success: true };
+
+  } catch (error) {
+    console.error(`Failed to open file in editor:`, error);
+    // Send a user-friendly error back to the renderer process
+    return { success: false, error: error.message };
+  }
 });
 
 ipcMain.handle('git-pull', async (_, repoName: string) => {
@@ -689,25 +729,69 @@ const createWindow = (): void => {
   });
 };
 
-ipcMain.on('submit-project-creation', async (_, { repoName, name, path: coverPath }) => {
-  const projectPath = path.join(getStoragePath(), getRepoFolderName(repoName), name);
-  const projectExists = await fs.pathExists(projectPath);
-  if (projectExists) {
-    dialog.showErrorBox('Project Exists', `A project named "${name}" already exists.`);
-    return;
-  }
-  await initializeNewProject(projectPath, coverPath);
+// Make sure you have jimp imported at the top of your src/index.ts
 
-  // Get a direct reference to the main window from the modal's parent property
-  const mainWindow = createProjectWindow?.getParentWindow();
+ipcMain.on('show-typeset-image-context-menu', (event, imagePath) => {
+  // Create the menu template
+  const template = [
+    {
+      label: 'Copy Image',
+      click: () => {
+        // This function executes when the user clicks the menu item
+        try {
+          const image = nativeImage.createFromPath(imagePath);
+          clipboard.writeImage(image);
+        } catch (error) {
+          console.error('Failed to copy image to clipboard:', error);
+        }
+      },
+    },
+  ];
 
-  if (createProjectWindow) {
-    createProjectWindow.close();
-  }
+  const menu = Menu.buildFromTemplate(template);
+  const window = BrowserWindow.fromWebContents(event.sender);
+  menu.popup({ window }); // Show the menu in the correct window
+});
 
-  // Use the direct reference to reload the projects
-  if (mainWindow) {
-    loadProjects(mainWindow, repoName);
+ipcMain.on('submit-project-creation', async (event, { repoName, name, path: coverPath }) => {
+  const projectPath = path.join(getStoragePath(), repoName, name);
+
+  try {
+    // 1. First, check if a project folder with that name already exists.
+    if (await fs.pathExists(projectPath)) {
+      dialog.showErrorBox('Project Exists', `A project named '${name}' already exists.`);
+      return;
+    }
+
+    const extension = path.extname(coverPath).toLowerCase();
+
+    // 2. Process the image IN MEMORY first to see if it's valid.
+    const image = await Jimp.read(coverPath);
+
+    // 3. If image processing succeeds, NOW create the folder.
+    await fs.ensureDir(projectPath);
+
+    // 4. Save the processed image.
+    let newCoverPath;
+    if (extension === '.webp') {
+      // If the original was webp, save it as PNG
+      newCoverPath = path.join(projectPath, 'cover.png');
+      await image.writeAsync(newCoverPath);
+    } else {
+      // Otherwise, just copy the original file (we know it's valid)
+      const newCoverName = `cover${extension}`;
+      newCoverPath = path.join(projectPath, newCoverName);
+      await fs.copyFile(coverPath, newCoverPath);
+    }
+
+    // 5. Send update to the renderer process to refresh its list.
+    if (mainWindow) {
+      mainWindow.webContents.send('repositories-updated');
+    }
+
+  } catch (error) {
+    // If any step fails (especially Jimp.read), show an error and do not create the folder.
+    dialog.showErrorBox('Project Creation Failed', `An error occurred: ${error.message}`);
   }
 });
 
@@ -1534,6 +1618,7 @@ async function updateAllRepositories() {
 }
 
 app.whenReady().then(async () => {
+    initializeDefaultSettings();
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [ `default-src 'self'; script-src 'self' ${!app.isPackaged ? "'unsafe-eval'" : ''}; style-src 'self' 'unsafe-inline'; img-src 'self' scanstation-asset: data:`, ], },
@@ -1617,6 +1702,7 @@ app.whenReady().then(async () => {
   }
 
   app.on('activate', async () => {
+ 
     if (BrowserWindow.getAllWindows().length === 0) {
         const gitInstalled = await checkGitInstallation();
         if (gitInstalled) {

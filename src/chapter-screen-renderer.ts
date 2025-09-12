@@ -12,6 +12,22 @@ function getBaseName(fileName: string): string {
     return parts.join('.');
 }
 
+function parsePageName(fileName: string): { isSpread: boolean; pages: number[]; display: string } {
+    const match = fileName.match(/^(\d+)(?:[-_](\d+))?\..+$/);
+    if (!match) {
+        return { isSpread: false, pages: [], display: fileName }; // Fallback for non-standard names
+    }
+    const firstPage = parseInt(match[1], 10);
+    if (match[2]) {
+        const secondPage = parseInt(match[2], 10);
+        // Ensure pages are in order
+        const start = Math.min(firstPage, secondPage);
+        const end = Math.max(firstPage, secondPage);
+        return { isSpread: true, pages: [start, end], display: `${start}-${end}` };
+    }
+    return { isSpread: false, pages: [firstPage], display: `${firstPage}` };
+}
+
 // --- Type Definitions ---
 interface PageStatus { CL: boolean; TL: boolean; TS: boolean; PR: boolean | 'annotated'; QC: boolean | 'annotated'; }
 interface Page { fileName: string; status: PageStatus; }
@@ -20,6 +36,7 @@ type DrawingData = { lines: { color: string; points: { x: number; y: number }[] 
 // --- Module State ---
 let currentRepoName: string | null = null, currentProjectName: string | null = null, currentChapterPath: string | null = null;
 let pages: Page[] = [];
+let hideExtensionsInSidebar = true;
 let activeView: {
   name: string;
   saveData: () => Promise<void>;
@@ -58,6 +75,7 @@ window.addEventListener('DOMContentLoaded', () => {
         currentRepoName = data.repoName;
         currentProjectName = data.projectName;
         currentChapterPath = data.chapterPath;
+        hideExtensionsInSidebar = await window.api.getSetting('hideFileExtensionsInSidebar') ?? true;
         await loadAndRenderPageStatus();
         showHomeView();
         window.api.startWatchingChapter(currentChapterPath);
@@ -186,14 +204,91 @@ async function loadAndRenderPageStatus() {
   if (result.success) { pages = result.pages; renderSidebar(); }
 }
 
+function makeImageZoomable(container: HTMLElement) {
+    const image = container.querySelector('img');
+    if (!image) return;
+
+    let scale = 1, translateX = 0, translateY = 0, isPanning = false, startPanX = 0, startPanY = 0;
+
+    const applyTransform = () => {
+        // Constrain panning so the image edges don't go past the container's center
+        const maxPanX = (image.width * scale - container.clientWidth) / 2;
+        const maxPanY = (image.height * scale - container.clientHeight) / 2;
+        translateX = Math.max(-maxPanX, Math.min(maxPanX, translateX));
+        translateY = Math.max(-maxPanY, Math.min(maxPanY, translateY));
+
+        image.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+    };
+    
+    container.addEventListener('wheel', (e: WheelEvent) => {
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+
+        const rect = container.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const oldScale = scale;
+        
+        scale *= e.deltaY > 0 ? 0.9 : 1.1; // Zoom out or in
+        scale = Math.max(1, Math.min(10, scale)); // Clamp scale between 1x and 10x
+
+        // Adjust translation to zoom towards the cursor
+        translateX = mouseX - (mouseX - translateX) * (scale / oldScale);
+        translateY = mouseY - (mouseY - translateY) * (scale / oldScale);
+
+        if (scale === 1) { translateX = 0; translateY = 0; }
+        
+        container.style.cursor = scale > 1 ? 'grab' : 'default';
+        applyTransform();
+    });
+
+    container.addEventListener('mousedown', (e) => {
+        if (scale <= 1) return;
+        e.preventDefault();
+        isPanning = true;
+        startPanX = e.clientX - translateX;
+        startPanY = e.clientY - translateY;
+        container.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mouseup', () => {
+        isPanning = false;
+        container.style.cursor = scale > 1 ? 'grab' : 'default';
+    });
+    
+    window.addEventListener('mousemove', (e) => {
+        if (!isPanning) return;
+        translateX = e.clientX - startPanX;
+        translateY = e.clientY - startPanY;
+        applyTransform();
+    });
+
+    container.addEventListener('dblclick', () => {
+        scale = 1; translateX = 0; translateY = 0;
+        container.style.cursor = 'default';
+        applyTransform();
+    });
+}
+
 function renderSidebar() {
   pageListDiv.innerHTML = '';
   if (pages.length === 0) { pageListDiv.innerHTML = '<p style="color: #99aab5; font-size: 14px;">No pages in "Raws" folder.</p>'; return; }
+
   pages.forEach((page, index) => {
     const item = document.createElement('div');
     item.className = 'page-status-item';
     item.id = `page-item-${page.fileName}`;
-    item.innerHTML = `<span class="page-name">${index + 1}: ${page.fileName}</span><div class="status-tags">${createStatusTag('CL', page.status.CL)}${createStatusTag('TL', page.status.TL)}${createStatusTag('TS', page.status.TS)}${createStatusTag('PR', page.status.PR)}${createStatusTag('QC', page.status.QC)}</div>`;
+
+    const pageInfo = parsePageName(page.fileName);
+    if (pageInfo.isSpread) {
+      item.classList.add('spread-item');
+    }
+
+const pageNameDisplay = hideExtensionsInSidebar
+  ? pageInfo.display
+  : `${pageInfo.display}: ${page.fileName}`;
+
+item.innerHTML = `<span class="page-name">${pageNameDisplay}</span><div class="status-tags">${createStatusTag('CL', page.status.CL)}${createStatusTag('TL', page.status.TL)}${createStatusTag('TS', page.status.TS)}${createStatusTag('PR', page.status.PR)}${createStatusTag('QC', page.status.QC)}</div>`;
     if (page.status.PR === 'annotated') {
       item.classList.add('clickable');
       item.addEventListener('click', () => showProofreadView(index));
@@ -248,6 +343,12 @@ function showProofreadView(startingIndex: number) {
   workspacePlaceholder.style.display = 'none';
   galleryViewContainer.style.display = 'flex';
   initProofreadView(startingIndex);
+
+    const rawContainer = document.getElementById('proofread-raw-container');
+  const tsContainer = document.getElementById('proofread-ts-container');
+  if (rawContainer) makeImageZoomable(rawContainer);
+  if (tsContainer) makeImageZoomable(tsContainer);
+
 }
 
 function showTypesetView(startingIndex: number) {
@@ -257,6 +358,8 @@ function showTypesetView(startingIndex: number) {
   workspacePlaceholder.style.display = 'none';
   galleryViewContainer.style.display = 'flex';
   initTypesetView(startingIndex);
+  const imageContainer = document.getElementById('typeset-image-container');
+  if (imageContainer) makeImageZoomable(imageContainer);
 }
 
 // --- View Initializers ---
@@ -409,7 +512,9 @@ const loadPage = async (index: number, isInitialLoad: boolean = false) => {
         }
         currentPageIndex = index;
         const page = pages[currentPageIndex];
-        pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
+        const totalPageCount = pages.reduce((acc, p) => acc + (parsePageName(p.fileName).pages.length || 1), 0);
+        const pageInfo = parsePageName(pages[currentPageIndex].fileName);
+        pageIndicator.textContent = pageInfo.isSpread ? `Pages ${pageInfo.display} of ${totalPageCount}` : `Page ${pageInfo.display} of ${totalPageCount}`;
         const imagePath = `${currentChapterPath}/Raws/${page.fileName}`.replace(/\\/g, '/');
         rawImage.src = `scanstation-asset:///${imagePath}`; //
         const textContent = await window.api.getFileContent(`${currentChapterPath}/data/TL Data/${page.fileName}.txt`);
@@ -461,8 +566,10 @@ const loadPage = async (index: number, isInitialLoad: boolean = false) => {
   gotoPageInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
           const pageNum = parseInt(gotoPageInput.value, 10);
-          if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= pages.length) {
-              loadPage(pageNum - 1); // 0-indexed
+          const targetIndex = pages.findIndex(p => parsePageName(p.fileName).pages.includes(pageNum));
+
+          if (targetIndex > -1) {
+              loadPage(targetIndex);
               gotoPageInput.value = '';
               gotoPageInput.blur();
           } else {
@@ -514,6 +621,7 @@ function initProofreadView(startingIndex: number) {
       }
     },
   };
+  // Activate zoom and pan for both images
 
 
   
@@ -532,8 +640,10 @@ const loadPage = async (index: number, isInitialLoad: boolean = false) => {
         }
         currentPageIndex = index;
         const page = pages[currentPageIndex];
-        pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
-        // (All the original image loading logic [cite: 204-218])
+        const totalPageCount = pages.reduce((acc, p) => acc + (parsePageName(p.fileName).pages.length || 1), 0);
+        const pageInfo = parsePageName(pages[currentPageIndex].fileName);
+        pageIndicator.textContent = pageInfo.isSpread ? `Pages ${pageInfo.display} of ${totalPageCount}` : `Page ${pageInfo.display} of ${totalPageCount}`;
+                // (All the original image loading logic [cite: 204-218])
         rawImage.src = ''; tsImage.src = '';
         const isSpread = /^\d+[-_]\d+\..+$/.test(page.fileName);
         let rawImagePath: string;
@@ -601,16 +711,18 @@ const loadPage = async (index: number, isInitialLoad: boolean = false) => {
     }
   });
   gotoPageInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-          const pageNum = parseInt(gotoPageInput.value, 10);
-          if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= pages.length) {
-              loadPage(pageNum - 1); // 0-indexed
-              gotoPageInput.value = '';
-              gotoPageInput.blur();
-          } else {
-              gotoPageInput.value = '';
-          }
-      }
+    if (e.key === 'Enter') {
+        const pageNum = parseInt(gotoPageInput.value, 10);
+        const targetIndex = pages.findIndex(p => parsePageName(p.fileName).pages.includes(pageNum));
+
+        if (targetIndex > -1) {
+            loadPage(targetIndex);
+            gotoPageInput.value = '';
+            gotoPageInput.blur();
+        } else {
+            gotoPageInput.value = '';
+        }
+    }
 });
 
   loadPage(startingIndex, true);
@@ -619,17 +731,43 @@ const loadPage = async (index: number, isInitialLoad: boolean = false) => {
 function initTypesetView(startingIndex: number) {
   const gotoPageInput = document.getElementById('goto-page-input') as HTMLInputElement;
   let currentPageIndex = startingIndex;
-  let currentImageType: 'cleaned' | 'raw' = 'cleaned';
-
+  let currentImageType: 'cleaned' | 'raw' | 'typeset' = 'cleaned';
   const pageIndicator = document.getElementById('typeset-page-indicator') as HTMLSpanElement;
-  const mainImage = document.getElementById('typeset-image') as HTMLImageElement;
+const openEditFolderBtn = document.getElementById('open-edit-folder-btn') as HTMLButtonElement;
+
+openEditFolderBtn.addEventListener('click', () => {
+    if (currentChapterPath) {
+        window.api.openChapterSubfolder({
+            chapterPath: currentChapterPath,
+            subfolder: 'Edit Files' // Corrected folder name
+        });
+    }
+});
+const mainImage = document.getElementById('typeset-image') as HTMLImageElement;
   const translationTextDiv = document.getElementById('typeset-translation-text') as HTMLDivElement;
   const nextBtn = document.getElementById('typeset-next-btn') as HTMLButtonElement;
   const prevBtn = document.getElementById('typeset-prev-btn') as HTMLButtonElement;
   const showCleanedBtn = document.getElementById('show-cleaned-btn') as HTMLButtonElement;
+  const showTypesetBtn = document.getElementById('show-typeset-btn') as HTMLButtonElement;
+  showTypesetBtn.addEventListener('click', () => {
+      currentImageType = 'typeset';
+      updateImageView();
+  });
   const showRawBtn = document.getElementById('show-raw-btn') as HTMLButtonElement;
   const drawingCanvas = document.getElementById('typeset-drawing-canvas') as HTMLCanvasElement;
   const ctx = drawingCanvas.getContext('2d');
+  mainImage.addEventListener('contextmenu', (e) => {
+    e.preventDefault(); // Prevents the default browser right-click menu
+
+    // The src attribute is 'scanstation-asset:///C:/path/to/image.png'
+    // We need to strip the custom protocol to get a valid file path.
+    const imagePath = mainImage.src.replace(/^scanstation-asset:\/\/\//, '');
+
+    // Ensure the path is not empty before sending it to the main process
+    if (imagePath) {
+      window.api.showTypesetImageContextMenu(imagePath);
+    }
+  });
 
   activeView = {
     name: 'typeset',
@@ -642,7 +780,7 @@ function initTypesetView(startingIndex: number) {
       }
     },
   };
-  // Listener for the new Go To Page input
+
   
   const redrawTypesetCanvas = (drawingData: DrawingData) => {
     if (!mainImage.clientWidth || !mainImage.clientHeight || !drawingData || !drawingData.lines) {
@@ -677,13 +815,23 @@ function initTypesetView(startingIndex: number) {
   const updateImageView = async () => {
     const page = pages[currentPageIndex];
     if (!page) return;
-    const imagePath = currentImageType === 'cleaned' 
-      ? `${currentChapterPath}/Raws Cleaned/${page.fileName}` 
-      : `${currentChapterPath}/Raws/${page.fileName}`;
-    
+    let imagePath: string;
+    switch (currentImageType) {
+        case 'raw':
+            imagePath = `${currentChapterPath}/Raws/${page.fileName}`;
+            break;
+        case 'typeset':
+            imagePath = `${currentChapterPath}/Typesetted/${page.fileName}`;
+            break;
+        default: // 'cleaned'
+            imagePath = `${currentChapterPath}/Raws Cleaned/${page.fileName}`;
+            break;
+    }
+
     mainImage.src = `scanstation-asset:///${imagePath.replace(/\\/g, '/')}`;
     showCleanedBtn.classList.toggle('active', currentImageType === 'cleaned');
-    showRawBtn.classList.toggle('active', currentImageType !== 'cleaned');
+    showRawBtn.classList.toggle('active', currentImageType === 'raw');
+    showTypesetBtn.classList.toggle('active', currentImageType === 'typeset');
     
     mainImage.onerror = () => { mainImage.src = ''; };
 
@@ -711,8 +859,9 @@ const loadPage = async (index: number, isInitialLoad: boolean = false) => {
         // Typeset view doesn't have an auto-save function to call
         currentPageIndex = index;
         const page = pages[currentPageIndex];
-        pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${pages.length}`;
-        await updateImageView();
+        const totalPageCount = pages.reduce((acc, p) => acc + (parsePageName(p.fileName).pages.length || 1), 0);
+        const pageInfo = parsePageName(pages[currentPageIndex].fileName);
+        pageIndicator.textContent = pageInfo.isSpread ? `Pages ${pageInfo.display} of ${totalPageCount}` : `Page ${pageInfo.display} of ${totalPageCount}`;        await updateImageView();
         const translatedText = await window.api.getFileContent(`${currentChapterPath}/data/TL Data/${page.fileName}.txt`);
         translationTextDiv.textContent = translatedText || 'No translation text found for this page.';
     };
@@ -760,24 +909,43 @@ const loadPage = async (index: number, isInitialLoad: boolean = false) => {
       const editor = (button as HTMLElement).dataset.editor as Editor;
       const page = pages[currentPageIndex];
       if (!page) return;
-      
-      const folder = currentImageType === 'cleaned' ? 'Raws Cleaned' : 'Raws';
-      const filePath = `${currentChapterPath}/${folder}/${page.fileName}`;
-      window.api.openFileInEditor({ editor, filePath });
+
+      let folder: string;
+      switch (currentImageType) {
+          case 'raw':
+              folder = 'Raws';
+              break;
+          case 'typeset':
+              folder = 'Typesetted';
+              break;
+          default: // 'cleaned'
+              folder = 'Raws Cleaned';
+              break;
+      }
+      const baseFileName = getBaseName(page.fileName); // Use the existing helper function
+
+      window.api.openFileInEditor({
+        editor,
+        chapterPath: currentChapterPath,
+        folder: folder,
+        baseFileName: baseFileName
+      });
     });
   });
   gotoPageInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         const pageNum = parseInt(gotoPageInput.value, 10);
-        if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= pages.length) {
-            loadPage(pageNum - 1); // loadPage is 0-indexed
-            gotoPageInput.value = ''; // Clear input
-            gotoPageInput.blur(); // Remove focus
+        const targetIndex = pages.findIndex(p => parsePageName(p.fileName).pages.includes(pageNum));
+
+        if (targetIndex > -1) {
+            loadPage(targetIndex);
+            gotoPageInput.value = '';
+            gotoPageInput.blur();
         } else {
-            gotoPageInput.value = ''; // Clear invalid input
+            gotoPageInput.value = '';
         }
     }
-});
+  });
 
   loadPage(startingIndex, true);
 }

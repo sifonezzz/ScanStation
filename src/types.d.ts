@@ -23,6 +23,7 @@ export interface IScanstationAPI {
 
   // Chapter Workspace
   openChapterFolder: (chapterPath: string) => void;
+  openChapterSubfolder: (data: { chapterPath: string; subfolder: string; }) => void; // <-- ADD THIS LINE
   healChapterFolders: (chapterPath: string) => void;
   onHealFoldersComplete: (callback: (result: { success: boolean; error?: string }) => void) => void;
   getChapterPageStatus: (chapterPath: string) => Promise<{ success: boolean; pages: any[] }>;
@@ -31,10 +32,11 @@ export interface IScanstationAPI {
   saveTranslationData: (data: any) => Promise<{ success: boolean; newStatus: any }>;
   saveProofreadData: (data: any) => Promise<{ success: boolean; newStatus: any; error?: string }>;
   markPageCorrect: (data: any) => Promise<{ success: boolean; newStatus: any; error?: string }>;
-  openFileInEditor: (data: { editor: Editor; filePath: string }) => Promise<{ success: boolean; error?: string }>;
+  openFileInEditor: (data: { editor: Editor; chapterPath: string; folder: string; baseFileName: string; }) => Promise<{ success: boolean; error?: string }>;
   getStitchedRawSpread: (data: { chapterPath: string; pageFile: string; }) => Promise<{ success: boolean; filePath?: string; error?: string; }>;
   startWatchingChapter: (chapterPath: string) => void;
   stopWatchingChapter: () => void;
+  showTypesetImageContextMenu: (imagePath: string) => void;
   onFileAdded: (callback: () => void) => void;
   renameFilesInFolder: (data: { chapterPath: string; folderName: string; }) => Promise<{ success: boolean; message: string; }>; 
   getProofreadImages: (data: { chapterPath: string; pageFile: string; }) => Promise<{ success: boolean; rawPath?: string; tsPath?: string; error?: string; }>;
@@ -86,6 +88,8 @@ export interface IScanstationAPI {
   gitPull: (repoName: string) => Promise<{ success: boolean; message?: string; conflict?: boolean; files?: string[] }>;  gitSyncRepository: (repoName: string) => Promise<{ success: boolean; message?: string; conflict?: boolean; files?: string[] }>;
   resolveConflictForcePush: (repoName: string) => Promise<{ success: boolean; message: string }>;
   // Universal APIs
+  getSetting: (key: keyof AppStore) => Promise<any>;
+  setSetting: (data: { key: keyof AppStore; value: any; }) => Promise<void>;
   selectCoverImage: () => void;
   openExternalLink: (url: string) => void;
   getGitIdentity: () => Promise<{ name: string; email: string }>;

@@ -8,6 +8,7 @@ export interface AppStore {
   githubPat?: string;
   repositories?: string[];
   selectedRepository?: string;
+  hideFileExtensionsInSidebar?: boolean; // <-- ADD THIS LINE
   // Paths to external editors
   photoshopPath?: string;
   illustratorPath?: string;

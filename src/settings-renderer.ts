@@ -10,6 +10,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     // --- General Elements ---
     const doneBtn = document.getElementById('done-btn');
     doneBtn.addEventListener('click', () => window.api.closeSettingsWindow());
+    const hideExtensionsCheckbox = document.getElementById('hide-extensions-checkbox') as HTMLInputElement;
+    const currentHideValue = await window.api.getSetting('hideFileExtensionsInSidebar');
+    hideExtensionsCheckbox.checked = currentHideValue ?? true; // Default to true if not set
+
 
     const addOfflineRepoBtn = document.getElementById('add-offline-repo-btn');
     const addOfflineRepoModal = document.getElementById('add-offline-repo-modal');
@@ -22,7 +26,12 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (offlineRepoNameInput) offlineRepoNameInput.value = '';
         if (addOfflineRepoModal) addOfflineRepoModal.style.display = 'flex';
     });
-
+    hideExtensionsCheckbox.addEventListener('change', () => {
+        window.api.setSetting({ 
+            key: 'hideFileExtensionsInSidebar', 
+            value: hideExtensionsCheckbox.checked 
+        });
+    });
     offlineModalCancelBtn?.addEventListener('click', () => {
         if (addOfflineRepoModal) addOfflineRepoModal.style.display = 'none';
     });

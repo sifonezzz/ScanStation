@@ -25,8 +25,13 @@
         <input type="number" id="goto-page-input" class="goto-input" placeholder="Go..." />
     </div>
 
-    <div class="image-switcher">
+    <div class="footer-action-buttons" style="display: flex; align-items: center; gap: 10px;">
+         <button id="open-edit-folder-btn" class="switcher-btn" style="background-color: #4a4d52; display: flex; align-items: center; gap: 6px;">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="white" width="18px" height="18px" viewBox="0 0 24 24"><path d="M10 4H4c-1.11 0-2 .89-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8c0-1.11-.9-2-2-2h-8l-2-2z"/></svg>
+            <span>Edit Files</span>
+        </button>
         <button id="show-cleaned-btn" class="switcher-btn active">Show Cleaned</button>
         <button id="show-raw-btn" class="switcher-btn">Show Raw</button>
+        <button id="show-typeset-btn" class="switcher-btn">Show Typeset</button>
     </div>
 </div>

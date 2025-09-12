@@ -11,6 +11,7 @@ const api: IScanstationAPI = {
 
   // --- Chapter Workspace ---
   openChapterFolder: (chapterPath: string) => ipcRenderer.send('open-chapter-folder', chapterPath),
+  openChapterSubfolder: (data) => ipcRenderer.send('open-chapter-subfolder', data), 
   healChapterFolders: (chapterPath: string) => ipcRenderer.send('heal-chapter-folders', chapterPath),
   onHealFoldersComplete: (callback) => ipcRenderer.on('heal-folders-complete', (_event, result) => callback(result)),
   getChapterPageStatus: (chapterPath: string) => ipcRenderer.invoke('get-chapter-page-status', chapterPath),
@@ -22,10 +23,12 @@ const api: IScanstationAPI = {
   openFileInEditor: (data: any) => ipcRenderer.invoke('open-file-in-editor', data),
   getStitchedRawSpread: (data) => ipcRenderer.invoke('get-stitched-raw-spread', data),
   startWatchingChapter: (chapterPath) => ipcRenderer.send('start-watching-chapter', chapterPath),
-  stopWatchingChapter: () => ipcRenderer.send('stop-watching-chapter'), 
+  stopWatchingChapter: () => ipcRenderer.send('stop-watching-chapter'),
+  showTypesetImageContextMenu: (imagePath) => ipcRenderer.send('show-typeset-image-context-menu', imagePath),
   onFileAdded: (callback) => ipcRenderer.on('file-added-to-chapter', callback),
   renameFilesInFolder: (data) => ipcRenderer.invoke('rename-files-in-folder', data),
   getProofreadImages: (data) => ipcRenderer.invoke('get-proofread-images', data),
+
 
 
   // --- Settings Window ---
@@ -81,6 +84,8 @@ const api: IScanstationAPI = {
   resolveConflictForcePush: (repoName) => ipcRenderer.invoke('resolve-conflict-force-push', repoName),
 
   // --- Universal APIs ---
+  getSetting: (key) => ipcRenderer.invoke('get-setting', key),
+  setSetting: (data) => ipcRenderer.invoke('set-setting', data),
   selectCoverImage: () => ipcRenderer.send('select-cover-image'),
   getGitIdentity: () => ipcRenderer.invoke('get-git-identity'),
   setGitIdentity: (data) => ipcRenderer.invoke('set-git-identity', data),
