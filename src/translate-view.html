@@ -1,11 +1,11 @@
 <div class="gallery-content">
     <div class="image-viewer">
-    <span class="zoom-indicator">Ctrl + Scroll to Zoom</span>
-    <div class="zoom-container" id="typeset-image-container">
-        <img id="typeset-image" src="" alt="Page Image" />
+        <img id="translate-raw-image" src="" alt="Raw Page" />
+        <canvas id="drawing-canvas"></canvas>
     </div>
-    <canvas id="typeset-drawing-canvas" style="position: absolute; pointer-events: none;"></canvas>
-</div>
+    <div class="tools-panel">
+        <textarea id="translation-text" placeholder="1. text...&#10;2. text..."></textarea>
+    </div>
 </div>
 
 <div class="gallery-footer">
@@ -14,11 +14,11 @@
         <button id="translate-next-btn">Next</button>
     </div>
     <div class="page-controls-center">
-        <span class="page-indicator" id="translate-page-indicator">Page X of Y</span>
+         <span class="page-indicator" id="translate-page-indicator">Page X of Y</span>
         <input type="number" id="goto-page-input" class="goto-input" placeholder="Go..." />
     </div>
     <div class="footer-action-buttons" style="display: flex; gap: 10px;">
-    <button id="clear-drawing-btn" style="background-color: #4a4d52;">Clear Drawing</button>
-    <button id="translate-save-btn">Save</button>
-</div>
+        <button id="clear-drawing-btn" style="background-color: #4a4d52;">Clear Drawing</button>
+        <button id="translate-save-btn">Save</button>
+    </div>
 </div>

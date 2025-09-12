@@ -205,71 +205,87 @@ async function loadAndRenderPageStatus() {
 }
 
 function makeImageZoomable(container: HTMLElement) {
+    const wrapper = container.querySelector<HTMLElement>('.zoom-content-wrapper');
     const image = container.querySelector('img');
-    if (!image) return;
+    if (!wrapper || !image) return;
 
-    let scale = 1, translateX = 0, translateY = 0, isPanning = false, startPanX = 0, startPanY = 0;
+    const transform = { scale: 1, x: 0, y: 0 };
 
-    const applyTransform = () => {
-        // Constrain panning so the image edges don't go past the container's center
-        const maxPanX = (image.width * scale - container.clientWidth) / 2;
-        const maxPanY = (image.height * scale - container.clientHeight) / 2;
-        translateX = Math.max(-maxPanX, Math.min(maxPanX, translateX));
-        translateY = Math.max(-maxPanY, Math.min(maxPanY, translateY));
+    gsap.ticker.add(() => {
+        wrapper.style.transform = `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`;
+    });
 
-        image.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
-    };
-    
     container.addEventListener('wheel', (e: WheelEvent) => {
+        if (e.target !== image) return;
         if (!e.ctrlKey) return;
         e.preventDefault();
 
         const rect = container.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
-        const oldScale = scale;
-        
-        scale *= e.deltaY > 0 ? 0.9 : 1.1; // Zoom out or in
-        scale = Math.max(1, Math.min(10, scale)); // Clamp scale between 1x and 10x
+        const oldScale = transform.scale;
 
-        // Adjust translation to zoom towards the cursor
-        translateX = mouseX - (mouseX - translateX) * (scale / oldScale);
-        translateY = mouseY - (mouseY - translateY) * (scale / oldScale);
+        let newScale = oldScale * (e.deltaY > 0 ? 0.9 : 1.1);
+        newScale = Math.max(1, Math.min(10, newScale));
 
-        if (scale === 1) { translateX = 0; translateY = 0; }
-        
-        container.style.cursor = scale > 1 ? 'grab' : 'default';
-        applyTransform();
+        if (newScale === 1) {
+            gsap.to(transform, { duration: 0.3, scale: 1, x: 0, y: 0, ease: 'power2.out' });
+        } else {
+            transform.x = mouseX - (mouseX - transform.x) * (newScale / oldScale);
+            transform.y = mouseY - (mouseY - transform.y) * (newScale / oldScale);
+            transform.scale = newScale;
+        }
+
+        container.style.cursor = transform.scale > 1 ? 'grab' : 'default';
     });
 
+    let isPanning = false, startPanX = 0, startPanY = 0;
     container.addEventListener('mousedown', (e) => {
-        if (scale <= 1) return;
+        if (transform.scale <= 1 || e.target !== image) return;
         e.preventDefault();
         isPanning = true;
-        startPanX = e.clientX - translateX;
-        startPanY = e.clientY - translateY;
+        startPanX = e.clientX - transform.x;
+        startPanY = e.clientY - transform.y;
         container.style.cursor = 'grabbing';
     });
 
     window.addEventListener('mouseup', () => {
         isPanning = false;
-        container.style.cursor = scale > 1 ? 'grab' : 'default';
+        container.style.cursor = transform.scale > 1 ? 'grab' : 'default';
     });
-    
+
     window.addEventListener('mousemove', (e) => {
         if (!isPanning) return;
-        translateX = e.clientX - startPanX;
-        translateY = e.clientY - startPanY;
-        applyTransform();
+
+        let newX = e.clientX - startPanX;
+        let newY = e.clientY - startPanY;
+
+        // --- NEW, STRICTER PANNING CONSTRAINTS ---
+        const rect = container.getBoundingClientRect();
+
+        // Calculate the total amount the scaled image overflows the container
+        const overflowX = (image.clientWidth * transform.scale) - rect.width;
+        const overflowY = (image.clientHeight * transform.scale) - rect.height;
+
+        // Find the boundary, which is half the overflow
+        const boundaryX = Math.max(0, overflowX / 2);
+        const boundaryY = Math.max(0, overflowY / 2);
+
+        // Clamp the new position within the calculated boundaries
+        newX = Math.max(-boundaryX, Math.min(boundaryX, newX));
+        newY = Math.max(-boundaryY, Math.min(boundaryY, newY));
+        // --- END OF NEW LOGIC ---
+
+        transform.x = newX;
+        transform.y = newY;
     });
 
-    container.addEventListener('dblclick', () => {
-        scale = 1; translateX = 0; translateY = 0;
+    container.addEventListener('dblclick', (e) => {
+        if (e.target !== image) return;
+        gsap.to(transform, { duration: 0.3, scale: 1, x: 0, y: 0, ease: 'power2.out' });
         container.style.cursor = 'default';
-        applyTransform();
     });
 }
-
 function renderSidebar() {
   pageListDiv.innerHTML = '';
   if (pages.length === 0) { pageListDiv.innerHTML = '<p style="color: #99aab5; font-size: 14px;">No pages in "Raws" folder.</p>'; return; }
@@ -342,13 +358,149 @@ function showProofreadView(startingIndex: number) {
   galleryViewContainer.innerHTML = proofreadViewHtml;
   workspacePlaceholder.style.display = 'none';
   galleryViewContainer.style.display = 'flex';
-  initProofreadView(startingIndex);
 
-    const rawContainer = document.getElementById('proofread-raw-container');
+  // --- All initialization logic is now safely below the HTML injection ---
+
+  const gotoPageInput = document.getElementById('goto-page-input') as HTMLInputElement;
+  let currentPageIndex = startingIndex;
+  const pageIndicator = document.getElementById('proofread-page-indicator') as HTMLSpanElement;
+  const saveBtn = document.getElementById('proofread-save-btn') as HTMLButtonElement;
+  const rawImage = document.getElementById('proofread-raw-image') as HTMLImageElement;
+  const tsImage = document.getElementById('proofread-ts-image') as HTMLImageElement;
+  const annotationsText = document.getElementById('proofread-text') as HTMLTextAreaElement;
+  const nextBtn = document.getElementById('proofread-next-btn') as HTMLButtonElement;
+  const prevBtn = document.getElementById('proofread-prev-btn') as HTMLButtonElement;
+  const correctBtn = document.getElementById('proofread-correct-btn') as HTMLButtonElement;
+
+  const saveAnnotations = async () => {
+    if (!pages[currentPageIndex]) return;
+    const pageFile = pages[currentPageIndex].fileName;
+    const result = await window.api.saveProofreadData({ chapterPath: currentChapterPath, pageFile, annotations: annotationsText.value });
+    if (result.success) {
+      pages[currentPageIndex].status = { ...pages[currentPageIndex].status, ...result.newStatus };
+      renderSidebar();
+    } else if (result.error) {
+      alert(`Could not save annotations: ${result.error}`);
+    }
+  };
+
+  activeView = {
+    name: 'proofread',
+    saveData: saveAnnotations,
+    onKeydown: (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') nextBtn.click();
+      else if (e.key === 'ArrowLeft') prevBtn.click();
+    },
+  };
+
+  const loadPage = async (index: number, isInitialLoad: boolean = false) => {
+    if (index < 0 || index >= pages.length) return;
+    if (!isInitialLoad && index === currentPageIndex) return;
+
+    const galleryContent = document.querySelector('.gallery-content');
+    const updateContent = async () => {
+      if (!isInitialLoad && pages[currentPageIndex] && currentPageIndex !== index) {
+        await saveAnnotations();
+      }
+      currentPageIndex = index;
+      const page = pages[currentPageIndex];
+      const totalPageCount = pages.reduce((acc, p) => acc + (parsePageName(p.fileName).pages.length || 1), 0);
+      const pageInfo = parsePageName(pages[currentPageIndex].fileName);
+      pageIndicator.textContent = pageInfo.isSpread ? `Pages ${pageInfo.display} of ${totalPageCount}` : `Page ${pageInfo.display} of ${totalPageCount}`;
+      
+      rawImage.src = '';
+      tsImage.src = '';
+      const isSpread = /^\d+[-_]\d+\..+$/.test(page.fileName);
+      let rawImagePath: string;
+      if (isSpread) {
+        const result = await window.api.getStitchedRawSpread({ chapterPath: currentChapterPath, pageFile: page.fileName });
+        if (result.success) { rawImagePath = result.filePath; } 
+        else { console.error('Failed to load spread:', result.error); }
+      } else {
+        const imagePaths = await window.api.getProofreadImages({ chapterPath: currentChapterPath, pageFile: page.fileName });
+        if (imagePaths.success) { rawImagePath = imagePaths.rawPath; }
+      }
+      const imagePaths = await window.api.getProofreadImages({ chapterPath: currentChapterPath, pageFile: page.fileName });
+      const timestamp = `?t=${Date.now()}`;
+      if (imagePaths.success) {
+        if (rawImagePath) { rawImage.src = `scanstation-asset:///${rawImagePath.replace(/\\/g, '/')}?${timestamp}`; } 
+        else { rawImage.src = ''; }
+        if (imagePaths.tsPath) { tsImage.src = `scanstation-asset:///${imagePaths.tsPath.replace(/\\/g, '/')}?${timestamp}`; } 
+        else { tsImage.src = ''; }
+      } else {
+        console.error('Failed to load proofread images:', imagePaths.error);
+        rawImage.src = ''; tsImage.src = '';
+      }
+      tsImage.onerror = () => { tsImage.src = ''; };
+      const annotations = await window.api.getFileContent(`${currentChapterPath}/data/PR Data/${getBaseName(page.fileName)}_proof.txt`);
+      annotationsText.value = annotations;
+    };
+
+    if (isInitialLoad) {
+      await updateContent();
+      gsap.fromTo([galleryContent, pageIndicator], { opacity: 0 }, { opacity: 1, duration: 0.3, ease: 'power1.out' });
+      return;
+    }
+
+    const direction = index > currentPageIndex ? 'next' : 'prev';
+    const slideOutX = direction === 'next' ? '-25%' : '25%';
+    const slideInX = direction === 'next' ? '25%' : '-25%';
+    gsap.to([galleryContent, pageIndicator], {
+      duration: 0.2, x: slideOutX, opacity: 0, ease: 'power1.in',
+      onComplete: async () => {
+        await updateContent();
+        gsap.fromTo([galleryContent, pageIndicator], { x: slideInX, opacity: 0 }, { duration: 0.2, x: '0%', opacity: 1, ease: 'power1.out' });
+      }
+    });
+  };
+
+  saveBtn.addEventListener('click', async () => {
+    const originalText = saveBtn.textContent;
+    saveBtn.textContent = 'Saving...';
+    await saveAnnotations();
+    setTimeout(() => { saveBtn.textContent = originalText; }, 1000);
+  });
+  
+  nextBtn.addEventListener('click', () => loadPage(currentPageIndex + 1));
+  prevBtn.addEventListener('click', () => loadPage(currentPageIndex - 1));
+  
+  correctBtn.addEventListener('click', async () => {
+    await saveAnnotations();
+    const pageFile = pages[currentPageIndex].fileName;
+    const result = await window.api.markPageCorrect({ chapterPath: currentChapterPath, pageFile });
+    if (result.success) {
+      pages[currentPageIndex].status = { ...pages[currentPageIndex].status, ...result.newStatus };
+      renderSidebar();
+      annotationsText.value = '';
+      if (currentPageIndex < pages.length - 1) { loadPage(currentPageIndex + 1); } 
+      else { showHomeView(); }
+    } else {
+      alert(`Could not mark page as correct: ${result.error}`);
+    }
+  });
+
+  gotoPageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const pageNum = parseInt(gotoPageInput.value, 10);
+      const targetIndex = pages.findIndex(p => parsePageName(p.fileName).pages.includes(pageNum));
+      if (targetIndex > -1) {
+        loadPage(targetIndex);
+        gotoPageInput.value = '';
+        gotoPageInput.blur();
+      } else {
+        gotoPageInput.value = '';
+      }
+    }
+  });
+  
+  // Activate zoom and pan
+  const rawContainer = document.getElementById('proofread-raw-container');
   const tsContainer = document.getElementById('proofread-ts-container');
   if (rawContainer) makeImageZoomable(rawContainer);
   if (tsContainer) makeImageZoomable(tsContainer);
 
+  // Load the first page
+  loadPage(startingIndex, true);
 }
 
 function showTypesetView(startingIndex: number) {
@@ -581,152 +733,7 @@ const loadPage = async (index: number, isInitialLoad: boolean = false) => {
   loadPage(startingIndex, true);
 }
 
-function initProofreadView(startingIndex: number) {
-  const gotoPageInput = document.getElementById('goto-page-input') as HTMLInputElement;
-  let currentPageIndex = startingIndex;
-  const pageIndicator = document.getElementById('proofread-page-indicator') as HTMLSpanElement;
-  const saveBtn = document.getElementById('proofread-save-btn') as HTMLButtonElement;
-  const rawImage = document.getElementById('proofread-raw-image') as HTMLImageElement;
-  const tsImage = document.getElementById('proofread-ts-image') as HTMLImageElement;
-  const annotationsText = document.getElementById('proofread-text') as HTMLTextAreaElement;
-  const nextBtn = document.getElementById('proofread-next-btn') as HTMLButtonElement;
-  const prevBtn = document.getElementById('proofread-prev-btn') as HTMLButtonElement;
-  const correctBtn = document.getElementById('proofread-correct-btn') as HTMLButtonElement;
 
-  saveBtn.addEventListener('click', async () => {
-      const originalText = saveBtn.textContent;
-      saveBtn.textContent = 'Saving...';
-      await saveAnnotations();
-      setTimeout(() => { saveBtn.textContent = originalText; }, 1000);
-    });
-  const saveAnnotations = async () => {
-    if (!pages[currentPageIndex]) return;
-    const pageFile = pages[currentPageIndex].fileName;
-    const result = await window.api.saveProofreadData({ chapterPath: currentChapterPath, pageFile, annotations: annotationsText.value });
-    if (result.success) {
-      pages[currentPageIndex].status = { ...pages[currentPageIndex].status, ...result.newStatus };
-      renderSidebar();
-    } else if (result.error) {
-      alert(`Could not save annotations: ${result.error}`);
-    }
-  };
-  activeView = {
-    name: 'proofread',
-    saveData: saveAnnotations,
-    onKeydown: (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') {
-        nextBtn.click();
-      } else if (e.key === 'ArrowLeft') {
-        prevBtn.click();
-      }
-    },
-  };
-  // Activate zoom and pan for both images
-
-
-  
-  // This new function JUST updates the content instantly
-
-// This is the animated function ONLY for Next/Prev
-const loadPage = async (index: number, isInitialLoad: boolean = false) => {
-    if (index < 0 || index >= pages.length) return;
-    if (!isInitialLoad && index === currentPageIndex) return;
-
-    const galleryContent = document.querySelector('.gallery-content');
-
-    const updateContent = async () => {
-        if (!isInitialLoad && pages[currentPageIndex] && currentPageIndex !== index) {
-            await saveAnnotations();
-        }
-        currentPageIndex = index;
-        const page = pages[currentPageIndex];
-        const totalPageCount = pages.reduce((acc, p) => acc + (parsePageName(p.fileName).pages.length || 1), 0);
-        const pageInfo = parsePageName(pages[currentPageIndex].fileName);
-        pageIndicator.textContent = pageInfo.isSpread ? `Pages ${pageInfo.display} of ${totalPageCount}` : `Page ${pageInfo.display} of ${totalPageCount}`;
-                // (All the original image loading logic [cite: 204-218])
-        rawImage.src = ''; tsImage.src = '';
-        const isSpread = /^\d+[-_]\d+\..+$/.test(page.fileName);
-        let rawImagePath: string;
-        if (isSpread) {
-            const result = await window.api.getStitchedRawSpread({ chapterPath: currentChapterPath, pageFile: page.fileName });
-            if (result.success) { rawImagePath = result.filePath; } else { console.error('Failed to load spread:', result.error); }
-        } else {
-            const imagePaths = await window.api.getProofreadImages({ chapterPath: currentChapterPath, pageFile: page.fileName });
-            if (imagePaths.success) { rawImagePath = imagePaths.rawPath; }
-        }
-        const imagePaths = await window.api.getProofreadImages({ chapterPath: currentChapterPath, pageFile: page.fileName });
-        const timestamp = `?t=${Date.now()}`;
-        if (imagePaths.success) {
-            if (rawImagePath) { rawImage.src = `scanstation-asset:///${rawImagePath.replace(/\\/g, '/')}?${timestamp}`; } 
-            else { rawImage.src = ''; }
-            if (imagePaths.tsPath) { tsImage.src = `scanstation-asset:///${imagePaths.tsPath.replace(/\\/g, '/')}?${timestamp}`; } 
-            else { tsImage.src = ''; }
-        } else {
-            console.error('Failed to load proofread images:', imagePaths.error);
-            rawImage.src = ''; tsImage.src = '';
-        }
-        tsImage.onerror = () => { tsImage.src = ''; };
-        const annotations = await window.api.getFileContent(`${currentChapterPath}/data/PR Data/${getBaseName(page.fileName)}_proof.txt`);
-        annotationsText.value = annotations;
-    };
-
-    if (isInitialLoad) {
-        await updateContent(); // Run instantly
-        gsap.fromTo([galleryContent, pageIndicator], { opacity: 0 }, { opacity: 1, duration: 0.3, ease: 'power1.out' });
-        return;
-    }
-
-    const direction = index > currentPageIndex ? 'next' : 'prev';
-    const slideOutX = direction === 'next' ? '-25%' : '25%';
-    const slideInX = direction === 'next' ? '25%' : '-25%';
-
-    gsap.to([galleryContent, pageIndicator], {
-        duration: 0.2,
-        x: slideOutX,
-        opacity: 0,
-        ease: 'power1.in',
-        onComplete: async () => {
-            await updateContent();
-            gsap.fromTo([galleryContent, pageIndicator],
-                { x: slideInX, opacity: 0 },
-                { duration: 0.2, x: '0%', opacity: 1, ease: 'power1.out' }
-            );
-        }
-    });
-};
-  nextBtn.addEventListener('click', () => loadPage(currentPageIndex + 1));
-  prevBtn.addEventListener('click', () => loadPage(currentPageIndex - 1));
-  correctBtn.addEventListener('click', async () => {
-    await saveAnnotations();
-    const pageFile = pages[currentPageIndex].fileName;
-    const result = await window.api.markPageCorrect({ chapterPath: currentChapterPath, pageFile });
-    if (result.success) {
-      pages[currentPageIndex].status = { ...pages[currentPageIndex].status, ...result.newStatus };
-      renderSidebar();
-      annotationsText.value = '';
-      if (currentPageIndex < pages.length - 1) { loadPage(currentPageIndex + 1); } else { showHomeView(); }
-    } else {
-      alert(`Could not mark page as correct: ${result.error}`);
-   
-    }
-  });
-  gotoPageInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        const pageNum = parseInt(gotoPageInput.value, 10);
-        const targetIndex = pages.findIndex(p => parsePageName(p.fileName).pages.includes(pageNum));
-
-        if (targetIndex > -1) {
-            loadPage(targetIndex);
-            gotoPageInput.value = '';
-            gotoPageInput.blur();
-        } else {
-            gotoPageInput.value = '';
-        }
-    }
-});
-
-  loadPage(startingIndex, true);
-}
 
 function initTypesetView(startingIndex: number) {
   const gotoPageInput = document.getElementById('goto-page-input') as HTMLInputElement;
